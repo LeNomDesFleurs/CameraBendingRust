@@ -9,9 +9,6 @@ pub use filter::FilterType;
 mod buffer;
 pub use buffer::DelayLine;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-
-
 fn main() -> anyhow::Result<()> {
     // Collect all arguments
     let args: Vec<String> = env::args().collect();
@@ -35,75 +32,107 @@ fn main() -> anyhow::Result<()> {
     let mut bufr = DelayLine::new(1000.0, buffer::DelayMode::Comb);
     let mut bufg = DelayLine::new(1000.0, buffer::DelayMode::Comb);
     let mut bufb = DelayLine::new(1000.0, buffer::DelayMode::Comb);
-    bufr.init(1.0);
-    bufr.set_delay_time(1.0);
-    bufg.init(1.0);
-    bufb.init(1.0);
+    bufr.init_delay(1.0, delay);
 
     filter_r.init(44000.0);
-    filter_r.set_frequence_and_resonance(6000.0, 200.);
-    filter_g.init(30000.0);
-    filter_b.init(40000.0);
+    filter_r.set_frequence_and_resonance(700.0, 2000.);
 
-    // let mut buf: Vec<u8> = Vec::new();
-    bufr.set_feedback(0.0);
-    bufg.set_feedback(0.0);
-    bufb.set_feedback(0.0);
+    // bufr.set_feedback(0.0);
 
     let mut bufimg = dynimg.into_rgb8();
 
     let width = bufimg.dimensions().0;
     let height = bufimg.dimensions().1;
     let size = width * height;
+
     let mut progress: u32 = 0;
     let mut norm_progress: f32 = 0.0;
     let mut modulation: f32 = 0.0;
 
+    let bayer_matrix = [[1, 2], [0, 1]];
+    let mut signal = vec![0.0, 0.0];
 
-    let mut samples  = vec![0.0; 5];
-    let mut colors = vec![0; 5];
-    let bayer_matrix = [[1, 0], [2, 1]];
+    for pixel in bufimg.enumerate_pixels_mut() {
+        //update the buffer for the dematricing
+        let color = bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
+        // apply filter to the new pixel and push it on the buffer
+        signal.push(pixel.2[color] as f32);
+    }
 
+    let mut prev = 0.0;
+    let mut toggle = false;
+    for (idx, sample) in signal.iter_mut().enumerate() {
+        toggle = !toggle;
+        if toggle {
+            prev = filter_r.process(*sample);
+            *sample = prev;
+        } else {
+            *sample = prev
+        }
+    }
 
-    for (pixel) in bufimg.enumerate_pixels_mut() {
-       
+    for pixel in bufimg.enumerate_pixels_mut() {
+        let color = bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
 
+        // Bayer reconstruction
+        let mut r = 0;
+        let mut g = 0;
+        let mut b = 0;
+        let y = pixel.0.saturating_sub(1);
+        let x = pixel.1.saturating_sub(1);
 
-        progress = progress + 1;
-        norm_progress = (progress as f32) / (size as f32);
-        modulation = (norm_progress * 500.0).sin().abs();
-        let modulationr = ((norm_progress * 5.0) + std::f32::consts::FRAC_PI_4)
-            .sin()
-            .abs();
-        let modulationg = ((norm_progress * 5.0) + std::f32::consts::FRAC_PI_2)
-            .sin()
-            .abs();
-        let modulationb = (norm_progress * 5.0).sin().abs();
+        match color {
+            // Red
+            0 => {
+                r = signal[((x * width) + y) as usize] as u8;
+                g = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
+                    + signal[((x + 1) * width + (y)) as usize]
+                    + signal[((x) * width + (y.saturating_sub(1))) as usize]
+                    + signal[((x) * width + (y + 1)) as usize])
+                    / 4.0) as u8;
+                b = ((signal[((x.saturating_sub(1)) * width + (y.saturating_sub(1))) as usize]
+                    + signal[((x + 1) * width + (y + 1)) as usize]
+                    + signal[((x + 1) * width + (y.saturating_sub(1))) as usize]
+                    + signal[((x.saturating_sub(1)) * width + (y + 1)) as usize])
+                    / 4.0) as u8;
+            }
+            1 => {
+                g = signal[((x * width) + y) as usize] as u8;
+                if y % 2 == 0 {
+                    b = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
+                        + signal[((x + 1) * width + (y)) as usize])
+                        / 2.0) as u8;
+                    r = ((signal[((x) * width + (y.saturating_sub(1))) as usize]
+                        + signal[((x) * width + (y + 1)) as usize])
+                        / 2.0) as u8;
+                } else {
+                    r = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
+                        + signal[((x + 1) * width + (y)) as usize])
+                        / 2.0) as u8;
+                    b = ((signal[((x) * width + (y.saturating_sub(1))) as usize]
+                        + signal[((x) * width + (y + 1)) as usize])
+                        / 2.0) as u8;
+                }
+            }
+            // B G B    R G R
+            // G R G or G B G
+            // B G B    R G R
+            2 => {
+                r = ((signal[((x.saturating_sub(1)) * width + (y.saturating_sub(1))) as usize]
+                    + signal[((x + 1) * width + (y + 1)) as usize]
+                    + signal[((x + 1) * width + (y.saturating_sub(1))) as usize]
+                    + signal[((x.saturating_sub(1)) * width + (y + 1)) as usize])
+                    / 4.0) as u8;
+                g = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
+                    + signal[((x + 1) * width + (y)) as usize]
+                    + signal[((x) * width + (y.saturating_sub(1))) as usize]
+                    + signal[((x) * width + (y + 1)) as usize])
+                    / 4.0) as u8;
+                b = signal[((x * width) + y) as usize] as u8;
+            }
+            _ => {}
+        }
 
-        bufr.set_delay_time(500.0 + (10.0 * modulation));
-        bufg.set_delay_time(500.0 + (10.0 * modulation));
-        bufb.set_delay_time(500.0 + (10.0 * modulation));
-
-        // bufr.set_feedback(modulationr);
-        bufg.set_feedback(modulationg);
-        bufb.set_feedback(modulationb);
-
-        filter_r.set_frequence_and_resonance(1000.+900.0 * modulationr, 300.+200.*modulationg);
-        filter_g.set_frequence_and_resonance(3000.+900.0 * modulationr, 500.+200.*modulationg);
-        filter_b.set_frequence_and_resonance(2000.+300.0 * modulationr, 100.+200.*modulationg);
-        // let mut r = buffer.process(pixel[0]as f32) as u8;
-        // let mut g = buffer.process(pixel[1]as f32) as u8;
-        // let mut b = buffer.process(pixel[2] as f32) as u8;
-        // let r = bufr.process(filter_r.process(pixel.2[0] as f32)) as u8;
-        // let g = bufg.process(filter_r.process(pixel.2[1] as f32)) as u8;
-        // let b = bufb.process(filter_r.process(pixel.2[2] as f32)) as u8;
-
-        let r = bufr.process((pixel.2[0] as f32)) as u8;
-        let g = bufg.process((pixel.2[1] as f32)) as u8;
-        let b = bufb.process((pixel.2[2] as f32)) as u8;
-        // r = filter_r.process(r as f32) as u8;
-        // g = filter_g.process(g as f32) as u8;
-        // b = filter_b.process(b as f32) as u8;
         *pixel.2 = image::Rgb([r, g, b]);
     }
 

@@ -32,7 +32,7 @@ impl RingBuffer {
     ///Buffer size in seconds
     pub fn new(max_time: f32) -> Self {
         RingBuffer {
-            interpolation_mode: InterpolationMode::Allpass,
+            interpolation_mode: InterpolationMode::None,
             freezed: false,
             reverse: false,
             sample_rate: 0.0,
@@ -60,6 +60,17 @@ impl RingBuffer {
         self.write = (buffer_size / 2) as f32;
         self.actual_size = (buffer_size / 2) as f32;
         self.size_goal = (buffer_size / 2) as i32;
+    }
+
+    pub fn init_delay(&mut self, sample_rate: f32, delay: f32) {
+        let buffer_size: usize = (sample_rate * self.max_time) as usize;
+        let delay_size = sample_rate * delay;
+        self.sample_rate = sample_rate;
+        self.buffer = vec![0.; buffer_size];
+        self.buffer_size = (buffer_size - 1) as i32;
+        self.write = delay_size as f32;
+        self.actual_size = delay_size as f32;
+        self.size_goal = delay_size as i32;
     }
 
     /// @brief increment pointer and set its int, incremented int and frac value
@@ -280,6 +291,10 @@ impl DelayLine {
 
     pub fn init(&mut self, sample_rate: f32) {
         self.buffer.init(sample_rate);
+    }
+
+    pub fn init_delay(&mut self, sample_rate: f32, delay: f32) {
+        self.buffer.init_delay(sample_rate, delay);
     }
 
     pub fn process(&mut self, input_sample: f32) -> f32 {
