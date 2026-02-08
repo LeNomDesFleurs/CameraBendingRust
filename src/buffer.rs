@@ -1,5 +1,5 @@
 use crate::outils::{self, rt60_to_gain};
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum InterpolationMode {
     None,
     Linear,
@@ -25,15 +25,14 @@ pub struct RingBuffer {
     frac: f32,
     output_sample: f32,
     max_time: f32, //size in seconds
-    // self.buffer_size en base 0
+                   // self.buffer_size en base 0
 }
 
 impl RingBuffer {
     ///Buffer size in seconds
     pub fn new(max_time: f32) -> Self {
-
         RingBuffer {
-            interpolation_mode: InterpolationMode::Linear,
+            interpolation_mode: InterpolationMode::Allpass,
             freezed: false,
             reverse: false,
             sample_rate: 0.0,
@@ -51,17 +50,16 @@ impl RingBuffer {
             output_sample: 0.,
             max_time,
         }
-        
     }
 
-    pub fn init(&mut self, sample_rate: f32){
+    pub fn init(&mut self, sample_rate: f32) {
         let buffer_size: usize = (sample_rate * self.max_time) as usize;
-        self.sample_rate= sample_rate;
+        self.sample_rate = sample_rate;
         self.buffer = vec![0.; buffer_size];
-        self.buffer_size= (buffer_size - 1) as i32;
-        self.write= (buffer_size / 2) as f32;
-        self.actual_size= (buffer_size / 2) as f32;
-        self.size_goal= (buffer_size / 2) as i32;
+        self.buffer_size = (buffer_size - 1) as i32;
+        self.write = (buffer_size / 2) as f32;
+        self.actual_size = (buffer_size / 2) as f32;
+        self.size_goal = (buffer_size / 2) as i32;
     }
 
     /// @brief increment pointer and set its int, incremented int and frac value
@@ -100,7 +98,7 @@ impl RingBuffer {
             InterpolationMode::Allpass => self.allpass_interpolation(),
         }
 
-        if self.freezed && self.step_size < 1.0{
+        if self.freezed && self.step_size < 1.0 {
             self.output_sample /= self.step_size.powf(1.5);
         }
 
@@ -121,7 +119,7 @@ impl RingBuffer {
     /// Interpolation passe-tout, recursion
     fn allpass_interpolation(&mut self) {
         // S[n]=Buf[i+1]+(1-frac)*Buf[i]-(1-frac)*S[n-1]
-        self.output_sample = (self.buffer[(self.i_read + 1) as usize])
+        self.output_sample = (self.buffer[(self.i_read) as usize])
             + ((1. - self.frac) * self.buffer[(self.i_read) as usize])
             - ((1. - self.frac) * self.output_sample);
     }
@@ -187,6 +185,12 @@ impl RingBuffer {
             outils::convert_ms_to_sample(delay_time, self.sample_rate) as i32;
         //   adding some 4 samples padding just to be sure.
         self.size_goal = (delay_in_samples.clamp(4, self.buffer_size as i32 - 4)) as i32;
+        if self.interpolation_mode == InterpolationMode::None {
+            self.read = self.write - self.size_goal as f32;
+            if self.read < 0. {
+                self.read = self.buffer_size as f32 - self.read;
+            }
+        }
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: f32) {
@@ -274,7 +278,7 @@ impl DelayLine {
         }
     }
 
-    pub fn init(&mut self, sample_rate: f32){
+    pub fn init(&mut self, sample_rate: f32) {
         self.buffer.init(sample_rate);
     }
 
@@ -285,18 +289,17 @@ impl DelayLine {
         let mut buf_out = 0.0;
         // buffer.writeSample(buf_in);
         // return buf_out;
-        match self.delay_mode{
-            DelayMode::Allpass=>{
+        match self.delay_mode {
+            DelayMode::Allpass => {
                 // float buf_in = (delay * m_gain) + input;
                 // float buf_out = delay + (input * -m_gain);
-                buf_in = (input_sample as u8).wrapping_add((delay * self.feedback)as u8) as f32;
-                buf_out = (input_sample as u8).wrapping_add((delay * -self.feedback)as u8) as f32;
+                buf_in = (input_sample as u8).wrapping_add((delay * self.feedback) as u8) as f32;
+                buf_out = (input_sample as u8).wrapping_add((delay * -self.feedback) as u8) as f32;
             }
-            DelayMode::Comb=>{
+            DelayMode::Comb => {
                 //buf_in = input_sample + delay * feedback
                 buf_out = delay;
-                buf_in = (input_sample as u8).wrapping_add((delay * self.feedback)as u8) as f32;
-
+                buf_in = (input_sample as u8).wrapping_add((delay * self.feedback) as u8) as f32;
             }
         }
         self.buffer.write_sample(buf_in);
