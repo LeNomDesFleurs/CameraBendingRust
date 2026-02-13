@@ -62,6 +62,7 @@ impl RingBuffer {
         self.size_goal = (buffer_size / 2) as i32;
     }
 
+    //init the size to avoid resizing at begining
     pub fn init_delay(&mut self, sample_rate: f32, delay: f32) {
         let buffer_size: usize = (sample_rate * self.max_time) as usize;
         let delay_size = sample_rate * delay;
