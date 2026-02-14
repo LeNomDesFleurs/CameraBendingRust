@@ -85,8 +85,8 @@ fn main() -> anyhow::Result<()> {
         let mut r = 0;
         let mut g = 0;
         let mut b = 0;
-        let y = pixel.1.saturating_sub(1);
-        let x = pixel.0.saturating_sub(1);
+        let y = pixel.1.saturating_sub(1) as usize;
+        let x = pixel.0.saturating_sub(1) as usize;
         // match color {
         //     0 => {
         //         r = columns[x as usize][y as usize] as u8;
@@ -112,51 +112,43 @@ fn main() -> anyhow::Result<()> {
 
         match color {
             0 => {
-                r = columns[x as usize][y as usize] as u8;
-                g = ((columns[x.saturating_sub(1) as usize][y as usize]
-                    + columns[(x + 1) as usize][y as usize]
-                    + columns[x as usize][y.saturating_sub(1) as usize]
-                    + columns[x as usize][(y + 1) as usize])
+                r = columns[x][y] as u8;
+                g = ((columns[x.saturating_sub(1)][y]
+                    + columns[x + 1][y]
+                    + columns[x][y.saturating_sub(1)]
+                    + columns[x][(y + 1)])
                     / 4.0) as u8;
-                b = ((columns[x.saturating_sub(1) as usize][y.saturating_sub(1) as usize]
-                    + columns[(x + 1) as usize][(y + 1) as usize]
-                    + columns[(x + 1) as usize][(y.saturating_sub(1)) as usize]
-                    + columns[x.saturating_sub(1) as usize][(y + 1) as usize])
+                b = ((columns[x.saturating_sub(1)][y.saturating_sub(1)]
+                    + columns[(x + 1)][(y + 1)]
+                    + columns[(x + 1)][(y.saturating_sub(1))]
+                    + columns[x.saturating_sub(1)][(y + 1)])
                     / 4.0) as u8;
             }
             1 => {
-                g = columns[x as usize][y as usize] as u8;
+                g = columns[x][y] as u8;
                 if y % 2 == 0 {
-                    b = ((columns[x.saturating_sub(1) as usize][(y) as usize]
-                        + columns[(x + 1) as usize][(y) as usize])
-                        / 2.0) as u8;
-                    r = ((columns[(x) as usize][(y.saturating_sub(1)) as usize]
-                        + columns[(x) as usize][(y + 1) as usize])
-                        / 2.0) as u8;
+                    b = ((columns[x.saturating_sub(1)][(y)] + columns[(x + 1)][(y)]) / 2.0) as u8;
+                    r = ((columns[(x)][(y.saturating_sub(1))] + columns[(x)][(y + 1)]) / 2.0) as u8;
                 } else {
-                    r = ((columns[x.saturating_sub(1) as usize][(y) as usize]
-                        + columns[(x + 1) as usize][(y) as usize])
-                        / 2.0) as u8;
-                    b = ((columns[(x) as usize][y.saturating_sub(1) as usize]
-                        + columns[(x) as usize][(y + 1) as usize])
-                        / 2.0) as u8;
+                    r = ((columns[x.saturating_sub(1)][(y)] + columns[(x + 1)][(y)]) / 2.0) as u8;
+                    b = ((columns[(x)][y.saturating_sub(1)] + columns[(x)][(y + 1)]) / 2.0) as u8;
                 }
             }
             // B G B    R G R
             // G R G or G B G
             // B G B    R G R
             2 => {
-                r = ((columns[x.saturating_sub(1) as usize][y.saturating_sub(1) as usize]
-                    + columns[(x + 1) as usize][(y + 1) as usize]
-                    + columns[(x + 1) as usize][(y.saturating_sub(1)) as usize]
-                    + columns[x.saturating_sub(1) as usize][(y + 1) as usize])
+                r = ((columns[x.saturating_sub(1)][y.saturating_sub(1)]
+                    + columns[(x + 1)][(y + 1)]
+                    + columns[(x + 1)][(y.saturating_sub(1))]
+                    + columns[x.saturating_sub(1)][(y + 1)])
                     / 4.0) as u8;
-                g = ((columns[x.saturating_sub(1) as usize][(y) as usize]
-                    + columns[(x + 1) as usize][(y) as usize]
-                    + columns[(x) as usize][y.saturating_sub(1) as usize]
-                    + columns[(x) as usize][(y + 1) as usize])
+                g = ((columns[x.saturating_sub(1)][(y)]
+                    + columns[(x + 1)][(y)]
+                    + columns[(x)][y.saturating_sub(1)]
+                    + columns[(x)][(y + 1)])
                     / 4.0) as u8;
-                b = columns[x as usize][y as usize] as u8;
+                b = columns[x][y] as u8;
             }
             _ => {}
         }
