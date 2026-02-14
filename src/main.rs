@@ -9,6 +9,14 @@ pub use filter::FilterType;
 mod buffer;
 pub use buffer::DelayLine;
 
+fn shaper(in_value: f32, min: f32, max: f32, curve: f32)->f32{
+    //normalize to [0 ; 1]
+    let mut value = (in_value-min)/(max-min);
+    value = ((curve*value).exp()-1.0)/((curve).exp()-1.0);
+    value = (value * max)+min;
+    value
+}
+
 fn main() -> anyhow::Result<()> {
     // Collect all arguments
     let args: Vec<String> = env::args().collect();
@@ -27,12 +35,12 @@ fn main() -> anyhow::Result<()> {
     // The dimensions method returns the images width and height.
     // println!("dimensions {:?}", dynimg.dimensions());
     let mut filter_r = Biquad::new(FilterType::LPF);
-    let mut filter_g = Biquad::new(FilterType::LPF);
-    let mut filter_b = Biquad::new(FilterType::LPF);
+    let _filter_g = Biquad::new(FilterType::LPF);
+    let _filter_b = Biquad::new(FilterType::LPF);
 
     let mut bufr = DelayLine::new(1000.0, buffer::DelayMode::Comb);
-    let mut bufg = DelayLine::new(1000.0, buffer::DelayMode::Comb);
-    let mut bufb = DelayLine::new(1000.0, buffer::DelayMode::Comb);
+    let _bufg = DelayLine::new(1000.0, buffer::DelayMode::Comb);
+    let _bufb = DelayLine::new(1000.0, buffer::DelayMode::Comb);
     bufr.init_delay(1.0, delay);
 
     filter_r.init(44000.0);
@@ -44,14 +52,14 @@ fn main() -> anyhow::Result<()> {
 
     let width = bufimg.dimensions().0;
     let height = bufimg.dimensions().1;
-    let size = width * height;
+    let _size = width * height;
 
-    let mut progress: u32 = 0;
-    let mut norm_progress: f32 = 0.0;
-    let mut modulation: f32 = 0.0;
+    let _progress: u32 = 0;
+    let _norm_progress: f32 = 0.0;
+    let _modulation: f32 = 0.0;
 
-    let bayer_matrix = [[1, 2], [0, 1]];
-    let mut signal = vec![0.0, 0.0];
+    let bayer_matrix = [[1, 0], [2, 1]];
+    let _signal = vec![0.0, 0.0];
     let mut columns: Vec<Vec<f32>> = vec![vec![0.0, 0.0]; width as usize];
 
     for pixel in bufimg.enumerate_pixels_mut() {
@@ -69,17 +77,30 @@ fn main() -> anyhow::Result<()> {
     for column in columns.iter_mut() {
         let mut prev_sample = 0.0;
         for sample in column.iter_mut() {
-            let temp = prev_sample * feedback + *sample;
+            let mut temp = prev_sample * feedback + *sample * (1.0-feedback);
+            if prev_sample < 50.0 {
+                temp = *sample;
+            }
             *sample = temp;
-            prev_sample = temp;
+            prev_sample = shaper(temp, 0.0, 255.0, 2.0);
         }
-        for idx in 0..1000 {
+
+        // douple pass in reverse
+        // for sample in column.iter_mut().rev() {
+        //     let mut temp = prev_sample * feedback + *sample * (1.0-feedback);
+        //     if prev_sample < 50.0 {
+        //         temp = *sample;
+        //     }
+        //     *sample = temp;
+        //     prev_sample = temp;
+        // }
+        for _idx in 0..1000 {
             bufr.process(0.0);
         }
     }
 
     for pixel in bufimg.enumerate_pixels_mut() {
-        let color = bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
+        let color = bayer_matrix[((pixel.0+1) % 2) as usize][((pixel.1+1) % 2) as usize];
 
         // Bayer reconstruction
         let mut r = 0;
@@ -116,22 +137,22 @@ fn main() -> anyhow::Result<()> {
                 g = ((columns[x.saturating_sub(1)][y]
                     + columns[x + 1][y]
                     + columns[x][y.saturating_sub(1)]
-                    + columns[x][(y + 1)])
+                    + columns[x][y + 1])
                     / 4.0) as u8;
                 b = ((columns[x.saturating_sub(1)][y.saturating_sub(1)]
-                    + columns[(x + 1)][(y + 1)]
-                    + columns[(x + 1)][(y.saturating_sub(1))]
-                    + columns[x.saturating_sub(1)][(y + 1)])
+                    + columns[x + 1][y + 1]
+                    + columns[x + 1][y.saturating_sub(1)]
+                    + columns[x.saturating_sub(1)][y + 1])
                     / 4.0) as u8;
             }
             1 => {
                 g = columns[x][y] as u8;
                 if y % 2 == 0 {
-                    b = ((columns[x.saturating_sub(1)][(y)] + columns[(x + 1)][(y)]) / 2.0) as u8;
-                    r = ((columns[(x)][(y.saturating_sub(1))] + columns[(x)][(y + 1)]) / 2.0) as u8;
+                    b = ((columns[x.saturating_sub(1)][y] + columns[x + 1][y]) / 2.0) as u8;
+                    r = ((columns[x][y.saturating_sub(1)] + columns[x][y + 1]) / 2.0) as u8;
                 } else {
-                    r = ((columns[x.saturating_sub(1)][(y)] + columns[(x + 1)][(y)]) / 2.0) as u8;
-                    b = ((columns[(x)][y.saturating_sub(1)] + columns[(x)][(y + 1)]) / 2.0) as u8;
+                    r = ((columns[x.saturating_sub(1)][y] + columns[x + 1][y]) / 2.0) as u8;
+                    b = ((columns[x][y.saturating_sub(1)] + columns[x][y + 1]) / 2.0) as u8;
                 }
             }
             // B G B    R G R
@@ -139,14 +160,14 @@ fn main() -> anyhow::Result<()> {
             // B G B    R G R
             2 => {
                 r = ((columns[x.saturating_sub(1)][y.saturating_sub(1)]
-                    + columns[(x + 1)][(y + 1)]
-                    + columns[(x + 1)][(y.saturating_sub(1))]
-                    + columns[x.saturating_sub(1)][(y + 1)])
+                    + columns[x + 1][y + 1]
+                    + columns[x + 1][y.saturating_sub(1)]
+                    + columns[x.saturating_sub(1)][y + 1])
                     / 4.0) as u8;
-                g = ((columns[x.saturating_sub(1)][(y)]
-                    + columns[(x + 1)][(y)]
-                    + columns[(x)][y.saturating_sub(1)]
-                    + columns[(x)][(y + 1)])
+                g = ((columns[x.saturating_sub(1)][y]
+                    + columns[x + 1][y]
+                    + columns[x][y.saturating_sub(1)]
+                    + columns[x][y + 1])
                     / 4.0) as u8;
                 b = columns[x][y] as u8;
             }

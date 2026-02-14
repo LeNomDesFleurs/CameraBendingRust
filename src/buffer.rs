@@ -157,7 +157,7 @@ impl RingBuffer {
     /// Triggered at each sample, update the step size and the self.actual_size
     /// to keep up with change of size goal
     fn update_step_size(&mut self) {
-        let correction_offset: f32 = 0.;
+        let _correction_offset: f32 = 0.;
         if self.actual_size > (self.size_goal - 5) as f32
             && self.actual_size < (self.size_goal + 5) as f32
         {
@@ -299,7 +299,7 @@ impl DelayLine {
     }
 
     pub fn process(&mut self, input_sample: f32) -> f32 {
-        let mut delay = self.buffer.read_sample();
+        let delay = self.buffer.read_sample();
         // delay = delay.clamp(-1.0, 1.0);
         let mut buf_in = 0.0;
         let mut buf_out = 0.0;
