@@ -53,6 +53,11 @@ impl Biquad {
         self.compute_coef();
     }
 
+    pub fn flush(&mut self){
+        self.b = [0.0, 0.0, 0.0];
+        self.a = [0.0, 0.0, 0.0];
+    }
+
     fn compute_lfp_coef(&mut self) {
         self.a_gain[0] = 1. + self.alpha;
 
@@ -184,6 +189,10 @@ impl Biquad {
     pub fn set_sample_rate(&mut self, _sample_rate: f32) {
         self.sample_rate = _sample_rate;
         self.compute_coef();
+    }
+
+    pub fn get_frequence_and_q(self)-> (f32, f32){
+        (self.frequency_cutoff, self.resonance)
     }
 
     pub fn process(&mut self, mut b0: f32) -> f32 {
