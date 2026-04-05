@@ -24,10 +24,10 @@ enum Signal<T>{
     CompositeVector([Vec<T>; 3]),
 }
 
-pub struct Processor<'a>{
+pub struct Processor{
    
 
-    parameters: &'a Parameters,
+    parameters: Parameters,
 
     //-------------processing-----------------
 
@@ -54,7 +54,7 @@ pub struct Processor<'a>{
     path: String,
 }
 
-impl Processor<'a>{
+impl Processor{
 
     pub fn new(in_path: String, parameters: &Parameters)->Self{
     let dynimg = image::open(in_path).unwrap();
@@ -62,7 +62,7 @@ impl Processor<'a>{
         let height = bufimg.dimensions().1;
         let width = bufimg.dimensions().0;
        let mut new = Self { 
-            parameters: parameters,
+            parameters: parameters::new(),
             quantization: 0.0, 
             signal: Signal::InterleavedVector(vec![0.0 as f32, 0.0 as f32]), 
             filter: Biquad::new(FilterType::LPF), 
@@ -78,13 +78,21 @@ impl Processor<'a>{
     }
 
     pub fn build_signal(&mut self){
+
+        match self.parameters.color_mode{
+            ColorMode::Bayer=>{}
+            ColorMode::Interleaved =>{
+                make_composite_vector();
+            }
+            ColorMode::Composite=>{}
+        }
         
         for pixel in self.image_buffer.enumerate_pixels_mut() {
 
             match self.parameters.colorMode{
 
                 //update the buffer for the dematricing
-                let color = self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
+                // let color = self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
             }
             // apply filter to the new pixel and push it on the buffer
             slice[pixel.0 as usize].push(pixel.2[color] as f32);
@@ -109,22 +117,32 @@ impl Processor<'a>{
 
     }
 
-    pub fn process_image(&mut self){
-        
+    pub fn make_composite_vector(&mut self)
+    {
+        let mut pixels = vec::new();
+        for 
+        signal = Signal::InterleavedVector(())
+    }
 
-        for column in slices.iter_mut() {
-        let mut prev_sample = 0.0;
+    pub fn process_image(&mut self, parameters: &Parameters){
+        self.parameters = *parameters;
 
-        for sample in slice.iter_mut() {
-            let temp = prev_sample * self.feedback + *sample;
-            *sample = temp;
-            prev_sample = temp;
-        }
-        if 
-        filter.flush;
-        for idx in 0..1000 {
-            bufr.process(0.0);
-        }
+        // for column in slices.iter_mut() {
+        // let mut prev_sample = 0.0;
+
+        // for sample in slice.iter_mut() {
+        //     let temp = prev_sample * self.feedback + *sample;
+        //     *sample = temp;
+        //     prev_sample = temp;
+        // }
+        // if 
+        // filter.flush;
+        // for idx in 0..1000 {
+        //     bufr.process(0.0);
+        // }
+
+
+
     }
     }
 
@@ -265,7 +283,7 @@ impl Processor<'a>{
     pub fn make_file(&self){
     // Write the contents of this image to the Writer in PNG format.
 
-        self.image_buffer.save(self.path).unwrap();
+        self.image_buffer.save("test.png").unwrap();
     }
 
 }

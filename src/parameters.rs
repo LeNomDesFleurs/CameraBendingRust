@@ -137,14 +137,14 @@ enum OrderMode{
 
 pub struct Parameters {
     // signal params
-    alpha_mode: Mode<AlphaMode>,
-    color_mode: Mode<ColorMode>,
-    order_mode: Mode<OrderMode>,
-    delay_time : Slider,
-    delay_feedback : Slider,
-    filter_cutoff : Slider,
-    filter_resonance : Slider,
-    continuous : Toggle,
+    pub alpha_mode: Mode<AlphaMode>,
+    pub color_mode: Mode<ColorMode>,
+    pub order_mode: Mode<OrderMode>,
+    pub delay_time : Slider,
+    pub delay_feedback : Slider,
+    pub filter_cutoff : Slider,
+    pub filter_resonance : Slider,
+    pub continuous : Toggle,
 
     pub parameter_amount: u32,
 }
