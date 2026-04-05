@@ -3,15 +3,15 @@ use std::cmp::{max, min};
 
 
 
-pub trait Parameter {
+pub trait Parameter{
     fn build_string(&self) -> String;
     fn increment(&mut self);
     fn decrement(&mut self);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 
-pub struct Mode<T: 'static> {
+pub struct Mode<T: 'static + Copy + Clone> {
     pub name: &'static str,
     pub options_text: &'static [&'static str],
     pub options_enum: &'static [T],
@@ -19,7 +19,7 @@ pub struct Mode<T: 'static> {
     pub value: usize,
 }
 
-impl<T> Mode<T> {
+impl<T: Copy + Clone> Mode<T> {
     pub fn new(name: &'static str, options_text: &'static [&'static str], options_enum: &'static [T] ) -> Self {
         assert_eq!(options_enum.len(), options_text.len(), "must have one option per text");
         Self {
@@ -36,7 +36,7 @@ impl<T> Mode<T> {
     }
 }
 
-impl<T> Parameter for Mode<T> {
+impl<T: Copy + Clone> Parameter for Mode<T> {
     fn build_string(&self) -> String {
         self.name.to_string() +" - "+ self.options_text[self.value]
     }
@@ -50,7 +50,7 @@ impl<T> Parameter for Mode<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 
 pub struct Slider {
     pub name: &'static str,
@@ -86,7 +86,7 @@ impl Parameter for Slider {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Toggle {
     pub name: &'static str,
     pub value: bool,
@@ -116,25 +116,28 @@ impl Parameter for Toggle {
 
 
 #[derive(Copy, Clone)]
-enum ColorMode{
+pub enum ColorMode{
     Bayer,
     Interleaved,
     Composite,
 }
 
 #[derive(Copy, Clone)]
-enum AlphaMode{
+pub enum AlphaMode{
     Preserve,
     Delete,
     Interleave, //does nothing in bayer mode
 }
 
 #[derive(Copy, Clone)]
-enum OrderMode{
+pub enum OrderMode{
     Column,
     Row,
+    ReverseRow,
+    ReverseColumn,
 }
 
+#[derive(Copy, Clone)]
 pub struct Parameters {
     // signal params
     pub alpha_mode: Mode<AlphaMode>,
