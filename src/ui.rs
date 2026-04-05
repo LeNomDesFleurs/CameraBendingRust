@@ -23,20 +23,20 @@ impl Ui {
     pub fn increment_parameter(&mut self, parameters: &mut Parameters) {
         let mut count = 0;
         parameters.each_mut(|param| {
-            count = count + 1;
             if count == self.position {
                 param.increment()
             }
+            count = count + 1;
         });
     }
 
     pub fn decrement_parameter(&mut self, parameters: &mut Parameters) {
         let mut count = 0;
         parameters.each_mut(|param| {
-            count = count + 1;
             if count == self.position {
                 param.decrement()
             }
+            count = count + 1;
         });
     }
 
