@@ -99,3 +99,66 @@ mod test {
         // Check empty list behaves right
     }
 }
+
+
+
+fn shaper(in_value: f32, min: f32, max: f32, curve: f32) -> f32 {
+    //normalize to [0 ; 1]
+    let mut value = (in_value - min) / (max - min);
+    value = ((curve * value).exp() - 1.0) / ((curve).exp() - 1.0);
+    value = (value * max) + min;
+    value
+}
+
+struct Random {
+    seed: f32,
+    min: f32,
+    max: f32,
+    shaped_value: f32,
+    m: f32,
+    smoothing: f32,
+}
+
+impl Random {
+    pub fn new() -> Random {
+        Random {
+            seed: 123456789.0,
+            min: 0.0,
+            max: 1.0,
+            shaped_value: 0.0,
+            m: 126379272.0,
+            smoothing: 0.0,
+        }
+    }
+
+    pub fn new_min_max(min: f32, max: f32, smoothing: f32) -> Random {
+        Random {
+            seed: 123456789.0,
+            min,
+            max,
+            shaped_value: 0.0,
+            m: 126379272.0,
+            smoothing,
+        }
+    }
+
+    pub fn process(&mut self) -> f32 {
+        self.seed = (1103515245.0 * self.seed + 5.0) % self.m;
+        let prev_value = self.shaped_value;
+        self.shape();
+        self.shaped_value =
+            (self.shaped_value * (1.0 - self.smoothing)) + (prev_value * (self.smoothing));
+        return self.shaped_value;
+    }
+
+    fn shape(&mut self) {
+        self.shaped_value = self.seed / self.m;
+        self.shaped_value = self.shaped_value * self.max;
+        self.shaped_value = self.shaped_value + self.min;
+    }
+}
+
+fn rand(seed: f32) -> f32 {
+    let seed = (1103515245.0 * seed + 5.0) % 126379272.0;
+    return seed;
+}
