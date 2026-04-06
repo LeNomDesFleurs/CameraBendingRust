@@ -95,11 +95,14 @@ impl Processor{
     }
     
     
-        pub fn set_filters(&mut self, freq: f32, resonance: f32){
-            // if filter[0].get_frequence_and_Q();
-            // for filter in self.filters.iterate(){
-            //     filter.set_frequence_and_resonance()
-            // }
+        pub fn set_filters(&mut self)
+        {   
+            self.filter.set_frequence_and_resonance(self.parameters.filter_cutoff.get() as f32, self.parameters.filter_resonance.value as f32)
+        }
+
+        pub fn set_delay(&mut self){
+            self.delay.set_delay_time(self.parameters.delay_time.get() as f32);
+            self.delay.set_feedback(self.parameters.delay_time.get() as f32);
         }
 
 
@@ -129,26 +132,18 @@ impl Processor{
 
         match self.parameters.color_mode.get(){
             ColorMode::Interleaved=>{
-                let mut count = 0;
-                let mut r = 0.0;
-                let mut g = 0.0;
-                let mut b = 0.0;
-                let mut a = 0.0;
+                let mut r;
+                let mut g;
+                let mut b;
+                let mut a;
 
                 for pixel in <Vec<[u8; 4]> as Clone>::clone(&self.ordered_picture).into_iter(){
-                    for color in pixel{
-                        self.filter.process(color as f32);
-                        r = self.delay.process(color as f32);
-                         self.filter.process(color as f32);
-                        g = self.delay.process(color as f32); 
-                        self.filter.process(color as f32);
-                        b = self.delay.process(color as f32);
-                         self.filter.process(color as f32);
-                        a = self.delay.process(color as f32);
-                    }
-                    self.processed_picture.push([r as u8, g as u8, b as u8, a as u8]);
-                    count = count+1;
 
+                        r = self.delay.process(self.filter.process(pixel[0] as f32));
+                        g = self.delay.process(self.filter.process(pixel[1] as f32));
+                        b = self.delay.process(self.filter.process(pixel[2] as f32));
+                        a = self.delay.process(self.filter.process(pixel[3] as f32));
+                    self.processed_picture.push([r as u8, g as u8, b as u8, a as u8]);
                 }
                 // reset on counter = width
             }
@@ -162,6 +157,9 @@ impl Processor{
 
     pub fn process_image(&mut self, parameters: &Parameters){
         self.parameters = *parameters;
+
+        self.set_delay();
+        self.set_filters();
         self.order_signal();
         // self.split_colors();
         self.process_signal();
@@ -182,14 +180,13 @@ let mut count = 0;
                     
                     match self.parameters.color_mode.get(){
                         ColorMode::Interleaved=>{
-                            count = count+1;
                             
                             // Bayer reconstruction
                             let mut r = self.processed_picture[count][0];
                             let mut g = self.processed_picture[count][1];
                             let mut b = self.processed_picture[count][2];
-                            let mut a = 0;
-
+                            let mut a = 127;
+                            
                             match self.parameters.alpha_mode.get(){
                                 AlphaMode::Delete=>{}
                                 AlphaMode::Interleave=>{
@@ -199,11 +196,12 @@ let mut count = 0;
                                     a = self.source_image_buffer[(x as u32, y as u32)].0[3];
                                 }
                                 
-
+                                
                             }
                            
                             
                             *pixel.2 = image::Rgba([r, g, b, a]);
+                            count = count+1;
                         }
                         ColorMode::Bayer=>{
                             let color = self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];

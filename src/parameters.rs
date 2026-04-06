@@ -70,6 +70,10 @@ impl Slider {
             step,
         }
     }
+
+    pub fn get(&self)->i32{
+        self.value
+    }
 }
 
 impl Parameter for Slider {
@@ -83,6 +87,7 @@ impl Parameter for Slider {
     fn increment(&mut self) {
         self.value = min(self.value + self.step, self.max);
     }
+
 }
 
 
@@ -98,6 +103,10 @@ impl Toggle {
             name,
             value: default,
         }
+    }
+
+    pub fn get(&self)->bool{
+        self.value
     }
 }
 
