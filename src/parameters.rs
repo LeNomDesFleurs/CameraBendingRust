@@ -131,7 +131,7 @@ pub enum ColorMode{
     Composite,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum AlphaMode{
     Preserve,
     Delete,

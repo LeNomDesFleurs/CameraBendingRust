@@ -14,6 +14,8 @@ pub use crate::buffer::DelayLine;
 // pub use crate::outils;
 
 
+
+
 //TODO add transparency Layer ?
 //might create some really cool things
 enum Signal<T>{
@@ -37,9 +39,10 @@ pub struct Processor{
     quantization: f32,
 
     ordered_picture: Vec<[u8; 4]>,
-    processed_picture: Vec<[u8; 4]>,
+    signal: Vec<f32>,
+    processed_picture: Vec<f32>,
     slices: Vec<Vec<f32>>,
-    signal: Signal<f32>,
+    // signal: Signal<f32>,
 
 
     filter: Biquad,
@@ -71,7 +74,8 @@ impl Processor{
        let mut new = Self { 
             parameters: Parameters::new(),
             quantization: 0.0, 
-            signal: Signal::InterleavedVector(vec![0.0 as f32, 0.0 as f32]), 
+            // signal: Signal::InterleavedVector(vec![0.0 as f32, 0.0 as f32]), 
+            signal: Vec::new(),
             filter: Biquad::new(FilterType::LPF), 
             delay: DelayLine::new(1000.0, buffer::DelayMode::Comb), 
             bayer_matrix: [[1, 2], [0, 1]],
@@ -126,33 +130,48 @@ impl Processor{
 
     }
 
+    fn process_sample(&mut self, sample:f32)->f32{
+        let mut temp= sample;
+        temp = self.filter.process(temp);
+        temp = self.delay.process(temp);
+        return temp;
+    }
+
+    
+    fn split_colors(&mut self){
+            self.signal.clear();
+            let mut color_layer = 3;
+            if *self.parameters.alpha_mode.get()==AlphaMode::Interleave {color_layer = 4};
+            match self.parameters.color_mode.get(){
+                ColorMode::Bayer=>{
+    
+                }
+                ColorMode::Interleaved=>{
+                    for pixel in self.ordered_picture.clone(){
+                            for i in 0..color_layer{
+                            self.signal.push(pixel[i] as f32);
+                            }
+                        }
+                }
+                ColorMode::Composite=>{
+                    for i in 0..color_layer{
+                        for pixel in self.ordered_picture.clone(){
+                            self.signal.push(pixel[i] as f32);
+                        }
+                        
+                    }
+                }
+            }
+        }
     fn process_signal(&mut self){
 
         self.processed_picture.clear();
 
-        match self.parameters.color_mode.get(){
-            ColorMode::Interleaved=>{
-                let mut r;
-                let mut g;
-                let mut b;
-                let mut a;
-
-                for pixel in <Vec<[u8; 4]> as Clone>::clone(&self.ordered_picture).into_iter(){
-
-                        r = self.delay.process(self.filter.process(pixel[0] as f32));
-                        g = self.delay.process(self.filter.process(pixel[1] as f32));
-                        b = self.delay.process(self.filter.process(pixel[2] as f32));
-                        a = self.delay.process(self.filter.process(pixel[3] as f32));
-                    self.processed_picture.push([r as u8, g as u8, b as u8, a as u8]);
-                }
-                // reset on counter = width
-            }
-            ColorMode::Bayer=>{}
-            ColorMode::Composite=>{
-
-            }
+        for pixel in self.signal.clone(){
+            let temp = self.process_sample(pixel);
+            self.processed_picture.push(temp);
         }
-       
+
     }
 
     pub fn process_image(&mut self, parameters: &Parameters){
@@ -160,9 +179,10 @@ impl Processor{
 
         self.set_delay();
         self.set_filters();
-        self.order_signal();
-        // self.split_colors();
-        self.process_signal();
+
+        self.order_signal(); // Vec<Vec<rgb>>
+        self.split_colors(); // Vec<f32>
+        self.process_signal(); // Vec<f32>
         self.reconstruct_image();
         self.make_file();
 
@@ -170,7 +190,12 @@ impl Processor{
     
 
     pub fn reconstruct_image(&mut self){
-let mut count = 0;
+        let mut count = 0;
+        let len = self.processed_picture.len();
+        let destination_len = self.destination_image_buffer.len();
+        let mut number_of_channels = 3;
+        if *self.parameters.alpha_mode.get() == AlphaMode::Interleave{number_of_channels = 4};
+        let offset = len / number_of_channels;
         match self.parameters.order_mode.get(){
             OrderMode::Row=>{
 
@@ -181,16 +206,15 @@ let mut count = 0;
                     match self.parameters.color_mode.get(){
                         ColorMode::Interleaved=>{
                             
-                            // Bayer reconstruction
-                            let mut r = self.processed_picture[count][0];
-                            let mut g = self.processed_picture[count][1];
-                            let mut b = self.processed_picture[count][2];
+                            let  r = self.processed_picture[count] as u8;
+                            let  g = self.processed_picture[count+1] as u8;
+                            let  b = self.processed_picture[count+2] as u8;
                             let mut a = 127;
                             
                             match self.parameters.alpha_mode.get(){
                                 AlphaMode::Delete=>{}
                                 AlphaMode::Interleave=>{
-                                    a = self.processed_picture[count][3];
+                                    a = self.processed_picture[count+3] as u8;
                                 }
                                 AlphaMode::Preserve=>{
                                     a = self.source_image_buffer[(x as u32, y as u32)].0[3];
@@ -208,8 +232,26 @@ let mut count = 0;
 
                         }
                         ColorMode::Composite=>{
-                            let color = self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
-
+                            let r = self.processed_picture[count] as u8;
+                            let g = self.processed_picture[count+offset] as u8;
+                            let b = self.processed_picture[count+(offset*2)] as u8;
+                            let mut a = 127;
+                            
+                            match self.parameters.alpha_mode.get(){
+                                AlphaMode::Delete=>{}
+                                AlphaMode::Interleave=>{
+                                    a = self.processed_picture[count+(offset*3)] as u8;
+                                }
+                                AlphaMode::Preserve=>{
+                                    a = self.source_image_buffer[(x as u32, y as u32)].0[3];
+                                }
+                                
+                                
+                            }
+                           
+                            
+                            *pixel.2 = image::Rgba([r, g, b, a]);
+                            count = count+1;
                         }
                     }
 
