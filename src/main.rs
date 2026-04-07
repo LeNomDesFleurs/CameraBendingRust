@@ -3,6 +3,7 @@
 use std::env;
 mod filter;
 mod outils;
+use crossterm::terminal::is_raw_mode_enabled;
 pub use filter::Biquad;
 pub use filter::FilterType;
 
@@ -38,6 +39,12 @@ fn main() -> anyhow::Result<()> {
     let mut processor = Processor::new(in_path, &parameters);
     let mut ui = Ui::new(&mut parameters);
 
+    std::panic::set_hook(Box::new(|info| {
+        clean_terminal();
+        eprintln!("{info}");
+    }));
+
+
     init_terminal();
     ui.update_display(&mut parameters);
 
@@ -47,7 +54,6 @@ fn main() -> anyhow::Result<()> {
         {
             match code {
                 KeyCode::Esc => {
-                    clean_terminal();
                     break;
                 }
                 KeyCode::Down => ui.increment_position(),
@@ -62,19 +68,23 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    clean_terminal();
+
     Ok(())
 }
 
 pub fn init_terminal() {
     enable_raw_mode().unwrap();
-    execute!(std::io::stdout(), cursor::Hide).unwrap();
-    println!("{}", terminal::Clear(terminal::ClearType::All));
-    println!("{}", cursor::MoveTo(0, 0));
+    execute!(std::io::stdout(),
+        terminal::EnterAlternateScreen,
+        cursor::Hide,
+    ).unwrap();
 }
 
 pub fn clean_terminal() {
-    execute!(std::io::stdout(), cursor::Show).unwrap();
-    println!("{}", terminal::Clear(terminal::ClearType::All));
-    println!("{}", cursor::MoveTo(0, 0));
+    execute!(std::io::stdout(),
+        terminal::LeaveAlternateScreen,
+        cursor::Show,
+    ).unwrap();
     disable_raw_mode().unwrap();
 }
