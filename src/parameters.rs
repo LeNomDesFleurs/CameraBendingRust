@@ -199,8 +199,8 @@ impl Parameters {
                         OrderMode::Column, 
                         OrderMode::Row]
                 ),
-                delay_time : Slider::new("Delay", 0, 5000, 0, 10),
-                delay_feedback : Slider::new("Feedback", 0, 1000, 0, 1),
+                delay_time : Slider::new("Delay", 0, 5000, 0, 1),
+                delay_feedback : Slider::new("Feedback", 0, 1000, 998, 1),
                 continuous : Toggle::new("Continuous", false),
                 filter_cutoff : Slider::new("Cutoff", 20, 20000, 2000, 100),
                 filter_resonance : Slider::new("Resonance", 0, 2000, 0, 1),
