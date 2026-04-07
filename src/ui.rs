@@ -2,8 +2,8 @@ use std::cmp::min;
 
 pub use crate::parameters::Parameters;
 use crossterm::{
-    cursor, event, event::Event, event::KeyCode, event::KeyEvent, event::KeyModifiers,
-    style::Stylize, terminal, terminal::disable_raw_mode, terminal::enable_raw_mode,
+    cursor,
+    style::Stylize, terminal,
 };
 
 pub struct Ui {

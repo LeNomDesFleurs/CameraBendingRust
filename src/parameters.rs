@@ -167,43 +167,45 @@ impl Parameters {
                 alpha_mode: Mode::new(
                     "Alpha Mode",
                     &[
-                        "Preserve",
                         "Delete",
+                        "Preserve",
                         "Interleave",
                     ],
                     &[
-                        AlphaMode::Preserve,
                         AlphaMode::Delete,
+                        AlphaMode::Preserve,
                         AlphaMode::Interleave,
                     ]
                 ),
                 color_mode : Mode::new(
                     "Color Mode",
                     &[
-                        "Bayer",
-                        "Interleaved",
                         "Composite",
+                        "Interleaved",
+                        "Bayer",
                     ],
                     &[
-                        ColorMode::Bayer,
-                        ColorMode::Interleaved,
                         ColorMode::Composite,
+                        ColorMode::Interleaved,
+                        ColorMode::Bayer,
                     ],
                 ),
                 order_mode : Mode::new(
                     "Order Mode",
                     &[
+                        "Row",
                         "Column", 
-                        "Row"],
+                        ],
                     &[
+                        OrderMode::Row,
                         OrderMode::Column, 
-                        OrderMode::Row]
+                        ]
                 ),
                 delay_time : Slider::new("Delay", 0, 5000, 0, 1),
-                delay_feedback : Slider::new("Feedback", 0, 1000, 998, 1),
+                delay_feedback : Slider::new("Feedback", 0, 1000, 0, 1),
                 continuous : Toggle::new("Continuous", false),
-                filter_cutoff : Slider::new("Cutoff", 20, 20000, 2000, 100),
-                filter_resonance : Slider::new("Resonance", 0, 2000, 0, 1),
+                filter_cutoff : Slider::new("Cutoff", 20, 100000, 100000, 1000),
+                filter_resonance : Slider::new("Resonance", 0, 2000, 1, 1),
                 parameter_amount: 0,
 
         };

@@ -30,7 +30,7 @@ fn main() -> anyhow::Result<()> {
     // Path of input file is the first argument
     // let in_path = &args[1];
     // let out_path = &args[2];
-    let in_path: &str = &"assets/colors.png".to_string();
+    let in_path: &str = &"assets/rose.jpg".to_string();
     // let out_path: &String = &"test6.jpg".to_string();
     // let feedback = args[3].parse::<f32>()?;
     // let delay = args[4].parse::<f32>()?;

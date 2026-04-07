@@ -94,7 +94,7 @@ impl Processor {
     pub fn set_filters(&mut self) {
         self.filter.set_frequence_and_resonance(
             self.parameters.filter_cutoff.get() as f32,
-            self.parameters.filter_resonance.value as f32,
+            self.parameters.filter_resonance.value as f32 / 10.0,
         )
     }
 
@@ -249,7 +249,7 @@ impl Processor {
                             let r = self.processed_picture[count] as u8;
                             let g = self.processed_picture[count + offset] as u8;
                             let b = self.processed_picture[count + (offset * 2)] as u8;
-                            let mut a = 127;
+                            let mut a = 255;
 
                             match self.parameters.alpha_mode.get() {
                                 AlphaMode::Delete => {}

@@ -70,6 +70,7 @@ impl RingBuffer {
         self.buffer = vec![0.; buffer_size];
         self.buffer_size = (buffer_size - 1) as i32;
         self.write = delay_size as f32;
+        self.read = 0.0;
         self.actual_size = delay_size as f32;
         self.size_goal = delay_size as i32;
     }
