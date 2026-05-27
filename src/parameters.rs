@@ -205,7 +205,7 @@ impl Parameters {
                 delay_feedback : Slider::new("Feedback", 0, 1000, 0, 1),
                 continuous : Toggle::new("Continuous", false),
                 filter_cutoff : Slider::new("Cutoff", 20, 100000, 100000, 1000),
-                filter_resonance : Slider::new("Resonance", 0, 2000, 1, 1),
+                filter_resonance : Slider::new("Resonance", 1, 2000, 1, 1),
                 parameter_amount: 0,
 
         };
