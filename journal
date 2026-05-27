@@ -1,0 +1,12 @@
+
+
+TODO
+
+- [ ] Bayer matricing not working for now
+- [ ] take delay offset in account
+
+
+BUG
+
+- [x] feedback broken
+- [ ] interleaved broken

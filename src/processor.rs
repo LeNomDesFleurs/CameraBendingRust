@@ -102,7 +102,7 @@ impl Processor {
         self.delay
             .set_delay_time(self.parameters.delay_time.get() as f32);
         self.delay
-            .set_feedback(self.parameters.delay_time.get() as f32 / 1000.0);
+            .set_feedback(self.parameters.delay_feedback.get() as f32 / 1000.0);
     }
 
     fn order_signal(&mut self) {
