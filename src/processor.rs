@@ -49,6 +49,8 @@ pub struct Processor {
     height: u32,
     size: u32,
 
+    number_of_channels: usize, //usize because used as index
+
     source_image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>>,
 
     destination_image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>>,
@@ -74,6 +76,7 @@ impl Processor {
             bayer_matrix: [[1, 2], [0, 1]],
             ordered_picture: Vec::new(),
             processed_picture: Vec::new(),
+            number_of_channels: 3,
             slices: Vec::new(),
             source_image_buffer: bufimg.clone(),
             destination_image_buffer: bufimg.clone(),
@@ -84,6 +87,49 @@ impl Processor {
         };
         new.init();
         new
+    }
+
+
+    /// Main function orchestrating everything else
+    pub fn process_image(&mut self, parameters: &Parameters) {
+        self.parameters = *parameters;
+
+        self.set_delay();
+        self.set_filters();
+
+        self.number_of_channels = match *self.parameters.alpha_mode.get() {
+            AlphaMode::Interleave => 4,
+            _ => 3,
+        };
+
+        self.order_signal(); // Vec<Vec<rgb>>
+        self.split_colors(); // Vec<f32>
+        self.process_signal(); // Vec<f32>
+        self.reconstruct_image();
+        self.make_file();
+    }
+
+    /// Make 3 lanes with all pixels depending on the ordering modes
+    fn order_signal(&mut self) {
+        self.ordered_picture.clear();
+        match self.parameters.order_mode.get() {
+            OrderMode::Row => {
+                for pixel in self.source_image_buffer.enumerate_pixels_mut() {
+                    self.ordered_picture
+                        .push([pixel.2[0], pixel.2[1], pixel.2[2], pixel.2[3]]);
+                }
+            }
+            OrderMode::Column => {
+                for x in 0 .. self.source_image_buffer.width(){
+                    for y in 0 .. self.source_image_buffer.height(){
+                        let pixel = self.source_image_buffer.get_pixel(x, y);
+                        self.ordered_picture.push([pixel[0], pixel[1], pixel[2], pixel[3]]);
+                    }
+                }
+            }
+            OrderMode::ReverseRow => {}
+            OrderMode::ReverseColumn => {}
+        }
     }
 
     pub fn init(&mut self) {
@@ -105,20 +151,6 @@ impl Processor {
             .set_feedback(self.parameters.delay_feedback.get() as f32 / 1000.0);
     }
 
-    fn order_signal(&mut self) {
-        self.ordered_picture.clear();
-        match self.parameters.order_mode.get() {
-            OrderMode::Row => {
-                for pixel in self.source_image_buffer.enumerate_pixels_mut() {
-                    self.ordered_picture
-                        .push([pixel.2[0], pixel.2[1], pixel.2[2], pixel.2[3]]);
-                }
-            }
-            OrderMode::Column => {}
-            OrderMode::ReverseRow => {}
-            OrderMode::ReverseColumn => {}
-        }
-    }
 
     pub fn bayer_dematricing() {}
 
@@ -138,25 +170,23 @@ impl Processor {
     fn split_colors(&mut self) {
         self.signal.clear();
         let mut count = 0;
-        let mut color_layer = 3;
-        if *self.parameters.alpha_mode.get() == AlphaMode::Interleave {
-            color_layer = 4
-        };
         let mut modulo = 0;
-        match self.parameters.order_mode.get(){
-            OrderMode::Column=>{modulo = self.height}
-            OrderMode::Row=>{modulo = self.width}
-            _=>{}
+
+        match self.parameters.order_mode.get() {
+            OrderMode::Column => modulo = self.height,
+            OrderMode::Row => modulo = self.width,
+            _ => {}
         }
+
         match self.parameters.color_mode.get() {
             ColorMode::Bayer => {}
             ColorMode::Interleaved => {
                 for pixel in self.ordered_picture.clone() {
                     let mut flag = Flag::Continue;
-                    if self.parameters.continuous.value == false && count % modulo == 0{
-                            flag = Flag::Reset
-                        }
-                    for i in 0..color_layer {
+                    if self.parameters.continuous.value == false && count % modulo == 0 {
+                        flag = Flag::Reset
+                    }
+                    for i in 0..self.number_of_channels {
                         self.signal.push((pixel[i] as f32, flag));
                         flag = Flag::Continue //dirty
                     }
@@ -165,11 +195,10 @@ impl Processor {
                 }
             }
             ColorMode::Composite => {
-                for i in 0..color_layer {
+                for i in 0..self.number_of_channels {
                     for pixel in self.ordered_picture.clone() {
-
                         let mut flag = Flag::Continue;
-                        if self.parameters.continuous.value == false && count % modulo == 0{
+                        if self.parameters.continuous.value == false && count % modulo == 0 {
                             flag = Flag::Reset
                         }
                         self.signal.push((pixel[i] as f32, flag));
@@ -180,12 +209,11 @@ impl Processor {
         }
     }
 
-
     fn process_signal(&mut self) {
         self.processed_picture.clear();
 
         for (pixel, flag) in self.signal.clone() {
-            if flag==Flag::Reset{
+            if flag == Flag::Reset {
                 self.reset_processing();
             }
             let temp = self.process_sample(pixel);
@@ -193,28 +221,12 @@ impl Processor {
         }
     }
 
-    pub fn process_image(&mut self, parameters: &Parameters) {
-        self.parameters = *parameters;
-
-        self.set_delay();
-        self.set_filters();
-
-        self.order_signal(); // Vec<Vec<rgb>>
-        self.split_colors(); // Vec<f32>
-        self.process_signal(); // Vec<f32>
-        self.reconstruct_image();
-        self.make_file();
-    }
-
     pub fn reconstruct_image(&mut self) {
         let mut count = 0;
         let len = self.processed_picture.len();
         let destination_len = self.destination_image_buffer.len();
-        let mut number_of_channels = 3;
-        if *self.parameters.alpha_mode.get() == AlphaMode::Interleave {
-            number_of_channels = 4
-        };
-        let offset = len / number_of_channels;
+
+        let offset = len / self.number_of_channels;
         match self.parameters.order_mode.get() {
             OrderMode::Row => {
                 for pixel in self.destination_image_buffer.enumerate_pixels_mut() {
@@ -226,20 +238,19 @@ impl Processor {
                             let r = self.processed_picture[count] as u8;
                             let g = self.processed_picture[count + 1] as u8;
                             let b = self.processed_picture[count + 2] as u8;
-                            let mut a = 127;
-
-                            match self.parameters.alpha_mode.get() {
-                                AlphaMode::Delete => {}
+                            let a = match self.parameters.alpha_mode.get() {
+                                AlphaMode::Delete => { 127 as u8 }
                                 AlphaMode::Interleave => {
-                                    a = self.processed_picture[count + 3] as u8;
+                                    self.processed_picture[count + 3] as u8
                                 }
                                 AlphaMode::Preserve => {
-                                    a = self.source_image_buffer[(x as u32, y as u32)].0[3];
+                                    127
+                                    // self.source_image_buffer.get_pixel(x, y)[3] as u8
                                 }
-                            }
+                            };
 
                             *pixel.2 = image::Rgba([r, g, b, a]);
-                            count = count + 1;
+                            count = count + self.number_of_channels;
                         }
                         ColorMode::Bayer => {
                             let color =

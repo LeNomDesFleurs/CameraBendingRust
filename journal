@@ -1,12 +1,24 @@
 
 
-TODO
+## TODO
 
 - [ ] Bayer matricing not working for now
 - [ ] take delay offset in account
+- [ ] index picture / create a hash with parameter
+    - [ ] use the parameters as argument for input
+- [ ] collumn
 
-
-BUG
+## BUG
 
 - [x] feedback broken
-- [ ] interleaved broken
+- [ ] interleaved broken 
+    count was update 1 by 1 instead of 4 by 4
+- [ ] preserve in interleaved broken
+
+## Journal
+
+Ok I remember What I was up to
+How to split rows and collums to know when to reset the filters and delay to avoid spilling on the next line
+
+
+I'll need a kind of matrix or something, like building a function from all the constraints then applying it to the signal
