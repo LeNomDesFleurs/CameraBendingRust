@@ -319,6 +319,11 @@ impl DelayLine {
                 buf_in = (input_sample as u8).wrapping_add((delay * self.feedback) as u8) as f32;
             }
         }
+
+        if self.delay_time == 0.0 {
+            buf_out = buf_in;
+        }
+
         self.buffer.write_sample(buf_in);
         buf_out
     }
