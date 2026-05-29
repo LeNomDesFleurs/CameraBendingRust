@@ -101,8 +101,9 @@ impl Processor {
             AlphaMode::Interleave => 4,
             _ => 3,
         };
-
+        // make an signal out of the picture, from 2d to 1d
         self.order_signal(); // Vec<Vec<rgb>>
+        // organize colors in multiple signals, or interleave them all in one signal
         self.split_colors(); // Vec<f32>
         self.process_signal(); // Vec<f32>
         self.reconstruct_image();
@@ -179,7 +180,35 @@ impl Processor {
         }
 
         match self.parameters.color_mode.get() {
-            ColorMode::Bayer => {}
+            ColorMode::Bayer => {
+
+                let mut bayer_row = false;
+                let mut bayer_column = false;
+                // alternate between GR and BG, allow for more modularity instead of building the bayer at the ordering stage with a classic array indexing
+                for pixel in self.ordered_picture.clone(){
+                    // match color {
+                        let mut flag = Flag::Continue;
+                    if count > modulo {
+                        count = 0;
+                        bayer_row = !bayer_row;
+                    }
+
+                    if self.parameters.continuous.value == false && count % modulo == 0 {
+                        flag = Flag::Reset
+                    }
+
+                        let color_index = self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
+                        let pixel_value = pixel[color_index];
+                    
+                        self.signal.push((pixel_value as f32, flag));
+
+
+                        count = count + 1;
+
+                        bayer_column = !bayer_column;
+                    }
+                
+            }
             ColorMode::Interleaved => {
                 for pixel in self.ordered_picture.clone() {
                     let mut flag = Flag::Continue;
@@ -255,6 +284,7 @@ impl Processor {
                         ColorMode::Bayer => {
                             let color =
                                 self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
+
                         }
                         ColorMode::Composite => {
                             let r = self.processed_picture[count] as u8;
@@ -290,24 +320,7 @@ impl Processor {
     }
 }
 
-// match color {
-//     0 => {
-//         r = columns[x as usize][y as usize] as u8;
-//         g = 0;
-//         b = 0;
-//     }
-//     1 => {
-//         r = 0;
-//         g = columns[x as usize][y as usize] as u8;
-//         b = 0;
-//     }
-//     2 => {
-//         r = 0;
-//         g = 0;
-//         b = columns[x as usize][y as usize] as u8;
-//     }
-//     _ => {}
-// }
+
 
 // r = columns[x as usize][y as usize] as u8;
 // g = columns[x as usize][y as usize] as u8;
