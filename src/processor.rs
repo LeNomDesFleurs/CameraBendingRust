@@ -306,7 +306,7 @@ impl Processor {
     }
 
     pub fn coord_to_signal(&mut self, x: u32, y: u32) -> f32 {
-        return self.signal[((x * self.width) + y) as usize] as f32;
+        return self.signal[((x * self.width) + y) as usize].0 as f32;
     }
 
 
@@ -379,50 +379,3 @@ impl Processor {
         self.destination_image_buffer.save("test.png").unwrap();
     }
 }
-
-// r = columns[x as usize][y as usize] as u8;
-// g = columns[x as usize][y as usize] as u8;
-// b = columns[x as usize][y as usize] as u8;
-
-// match color {
-//     0 => {
-//         r = columns[x][y] as u8;
-//         g = ((columns[x.saturating_sub(1)][y]
-//             + columns[x + 1][y]
-//             + columns[x][y.saturating_sub(1)]
-//             + columns[x][y + 1])
-//             / 4.0) as u8;
-//         b = ((columns[x.saturating_sub(1)][y.saturating_sub(1)]
-//             + columns[x + 1][y + 1]
-//             + columns[x + 1][y.saturating_sub(1)]
-//             + columns[x.saturating_sub(1)][y + 1])
-//             / 4.0) as u8;
-//     }
-//     1 => {
-//         g = columns[x][y] as u8;
-//         if y % 2 == 0 {
-//             b = ((columns[x.saturating_sub(1)][y] + columns[x + 1][y]) / 2.0) as u8;
-//             r = ((columns[x][y.saturating_sub(1)] + columns[x][y + 1]) / 2.0) as u8;
-//         } else {
-//             r = ((columns[x.saturating_sub(1)][y] + columns[x + 1][y]) / 2.0) as u8;
-//             b = ((columns[x][y.saturating_sub(1)] + columns[x][y + 1]) / 2.0) as u8;
-//         }
-//     }
-//     // B G B    R G R
-//     // G R G or G B G
-//     // B G B    R G R
-//     2 => {
-//         r = ((columns[x.saturating_sub(1)][y.saturating_sub(1)]
-//             + columns[x + 1][y + 1]
-//             + columns[x + 1][y.saturating_sub(1)]
-//             + columns[x.saturating_sub(1)][y + 1])
-//             / 4.0) as u8;
-//         g = ((columns[x.saturating_sub(1)][y]
-//             + columns[x + 1][y]
-//             + columns[x][y.saturating_sub(1)]
-//             + columns[x][y + 1])
-//             / 4.0) as u8;
-//         b = columns[x][y] as u8;
-//     }
-//     _ => {}
-// }
