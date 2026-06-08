@@ -34,3 +34,12 @@ have a function for each color ?
 
 
 ~~I use u8 for x and y which is obviously wrong, to do~~
+
+the program still compiles and works when using bayer
+but don't trust it the actual function are just not plugged
+
+I got a problem
+I want to borrow different part of the stuct at the same time.
+seems like rust devs have thought [about this](https://doc.rust-lang.org/nomicon/borrow-splitting.html)
+
+I'll need to ask a rust pro

@@ -253,9 +253,10 @@ impl Processor {
         let offset = len / self.number_of_channels;
         match self.parameters.order_mode.get() {
             OrderMode::Row => {
-                for pixel in self.destination_image_buffer.enumerate_pixels_mut() {
-                    let y = pixel.1.saturating_sub(1) as usize;
-                    let x = pixel.0.saturating_sub(1) as usize;
+                let mut dest: &ImageBuffer<Rgba<u8>, Vec<u8>> =  & self.destination_image_buffer;
+                for (xu, yu, pixel) in dest.enumerate_pixels_mut() {
+                    let x = xu.saturating_sub(1) as usize;
+                    let y = yu.saturating_sub(1) as usize;
 
                     match self.parameters.color_mode.get() {
                         ColorMode::Interleaved => {
@@ -271,12 +272,15 @@ impl Processor {
                                 }
                             };
 
-                            *pixel.2 = image::Rgba([r, g, b, a]);
+                            *pixel = image::Rgba([r, g, b, a]);
                             count = count + self.number_of_channels;
                         }
                         ColorMode::Bayer => {
                             let color =
-                                self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
+                                self.bayer_matrix[x % 2][y % 2] as usize;
+                                let (r, g, b) = self.bayer_dematricing(x, y, color);
+                                *pixel = image::Rgba([r, g, b, 127]);
+                                count = count + 1;
                         }
                         ColorMode::Composite => {
                             let r = self.processed_picture[count] as u8;
@@ -294,7 +298,7 @@ impl Processor {
                                 }
                             }
 
-                            *pixel.2 = image::Rgba([r, g, b, a]);
+                            *pixel = image::Rgba([r, g, b, a]);
                             count = count + 1;
                         }
                     }
@@ -305,13 +309,13 @@ impl Processor {
         }
     }
 
-    pub fn coord_to_signal(&mut self, x: u32, y: u32) -> f32 {
-        return self.signal[((x * self.width) + y) as usize].0 as f32;
+    pub fn coord_to_signal(&mut self, x: usize, y: usize) -> f32 {
+        return self.signal[((x * self.width as usize) + y) as usize].0 as f32;
     }
 
 
    
-    pub fn straight_cross_matrix(&mut self, x:u32, y:u32)->u8{
+    pub fn straight_cross_matrix(&mut self, x:usize, y:usize)->u8{
                     ((self.coord_to_signal(x.saturating_sub(1), y)
                     + self.coord_to_signal(x + 1, y)
                     + self.coord_to_signal(x, y.saturating_sub(1))
@@ -319,7 +323,7 @@ impl Processor {
                     / 4.0) as u8
     }
 
-        pub fn oblique_cross_matrix(&mut self, x:u32, y:u32)->u8{
+        pub fn oblique_cross_matrix(&mut self, x:usize, y:usize)->u8{
                    ((self.coord_to_signal(x.saturating_sub(1), y.saturating_sub(1))
                     + self.coord_to_signal(x + 1, y + 1)
                     + self.coord_to_signal(x + 1, y.saturating_sub(1))
@@ -327,16 +331,16 @@ impl Processor {
                     / 4.0) as u8
     }
 
-    pub fn horizontal_matrix(&mut self, x:u32, y:u32)->u8{
+    pub fn horizontal_matrix(&mut self, x:usize, y:usize)->u8{
         ((self.coord_to_signal(x.saturating_sub(1), y) + self.coord_to_signal(x+1, y)) /2.0) as u8
 
     }
 
-    pub fn vertical_matrix(&mut self, x:u32, y:u32)->u8{
+    pub fn vertical_matrix(&mut self, x:usize, y:usize)->u8{
         ((self.coord_to_signal(x, y.saturating_sub(1)) + self.coord_to_signal(x, y+1)) /2.0) as u8
     }
 
-    pub fn bayer_dematricing(&mut self, x: u32, y: u32, pixel_color: u8) -> (u8, u8, u8) {
+    pub fn bayer_dematricing(&mut self, x: usize, y: usize, pixel_color: usize) -> (u8, u8, u8) {
         let (mut r, mut g, mut b)= (0, 0, 0);
         
         match pixel_color {
