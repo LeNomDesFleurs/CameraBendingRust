@@ -28,3 +28,9 @@ I'll need a kind of matrix or something, like building a function from all the c
 I added bayer construction. The problem with the bayer in regard to composite and interleaved is that it's not really made in to phase, I would tend to order and signalise at the same point. The main problem is that you lose the row / col index when ordering. What I tried right now is to alternate R & G at each pixel, then swap to G&B when going to the next row / collumn. It will probably cause some problem in the near futur for dematricing were colors won't be at the good place, but anyway I'll see.
 
 One of the big problem with my structure is that adding more ordering mode (diagonal, etc...) might prove mighty difficult.
+
+pass a reference ?
+have a function for each color ?
+
+
+~~I use u8 for x and y which is obviously wrong, to do~~

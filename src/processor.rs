@@ -89,7 +89,6 @@ impl Processor {
         new
     }
 
-
     /// Main function orchestrating everything else
     pub fn process_image(&mut self, parameters: &Parameters) {
         self.parameters = *parameters;
@@ -103,7 +102,7 @@ impl Processor {
         };
         // make an signal out of the picture, from 2d to 1d
         self.order_signal(); // Vec<Vec<rgb>>
-        // organize colors in multiple signals, or interleave them all in one signal
+                             // organize colors in multiple signals, or interleave them all in one signal
         self.split_colors(); // Vec<f32>
         self.process_signal(); // Vec<f32>
         self.reconstruct_image();
@@ -121,10 +120,11 @@ impl Processor {
                 }
             }
             OrderMode::Column => {
-                for x in 0 .. self.source_image_buffer.width(){
-                    for y in 0 .. self.source_image_buffer.height(){
+                for x in 0..self.source_image_buffer.width() {
+                    for y in 0..self.source_image_buffer.height() {
                         let pixel = self.source_image_buffer.get_pixel(x, y);
-                        self.ordered_picture.push([pixel[0], pixel[1], pixel[2], pixel[3]]);
+                        self.ordered_picture
+                            .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
                     }
                 }
             }
@@ -152,9 +152,6 @@ impl Processor {
             .set_feedback(self.parameters.delay_feedback.get() as f32 / 1000.0);
     }
 
-
-    pub fn bayer_dematricing() {}
-
     fn reset_processing(&mut self) {
         self.filter.flush();
         self.delay
@@ -181,13 +178,12 @@ impl Processor {
 
         match self.parameters.color_mode.get() {
             ColorMode::Bayer => {
-
                 let mut bayer_row = false;
                 let mut bayer_column = false;
                 // alternate between GR and BG, allow for more modularity instead of building the bayer at the ordering stage with a classic array indexing
-                for pixel in self.ordered_picture.clone(){
+                for pixel in self.ordered_picture.clone() {
                     // match color {
-                        let mut flag = Flag::Continue;
+                    let mut flag = Flag::Continue;
                     if count > modulo {
                         count = 0;
                         bayer_row = !bayer_row;
@@ -197,17 +193,16 @@ impl Processor {
                         flag = Flag::Reset
                     }
 
-                        let color_index = self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
-                        let pixel_value = pixel[color_index];
-                    
-                        self.signal.push((pixel_value as f32, flag));
+                    let color_index =
+                        self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
+                    let pixel_value = pixel[color_index];
 
+                    self.signal.push((pixel_value as f32, flag));
 
-                        count = count + 1;
+                    count = count + 1;
 
-                        bayer_column = !bayer_column;
-                    }
-                
+                    bayer_column = !bayer_column;
+                }
             }
             ColorMode::Interleaved => {
                 for pixel in self.ordered_picture.clone() {
@@ -268,10 +263,8 @@ impl Processor {
                             let g = self.processed_picture[count + 1] as u8;
                             let b = self.processed_picture[count + 2] as u8;
                             let a = match self.parameters.alpha_mode.get() {
-                                AlphaMode::Delete => { 127 as u8 }
-                                AlphaMode::Interleave => {
-                                    self.processed_picture[count + 3] as u8
-                                }
+                                AlphaMode::Delete => 127 as u8,
+                                AlphaMode::Interleave => self.processed_picture[count + 3] as u8,
                                 AlphaMode::Preserve => {
                                     127
                                     // self.source_image_buffer.get_pixel(x, y)[3] as u8
@@ -284,7 +277,6 @@ impl Processor {
                         ColorMode::Bayer => {
                             let color =
                                 self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
-
                         }
                         ColorMode::Composite => {
                             let r = self.processed_picture[count] as u8;
@@ -313,14 +305,80 @@ impl Processor {
         }
     }
 
+    pub fn coord_to_signal(&mut self, x: u32, y: u32) -> f32 {
+        return self.signal[((x * self.width) + y) as usize] as f32;
+    }
+
+
+   
+    pub fn straight_cross_matrix(&mut self, x:u32, y:u32)->u8{
+                    ((self.coord_to_signal(x.saturating_sub(1), y)
+                    + self.coord_to_signal(x + 1, y)
+                    + self.coord_to_signal(x, y.saturating_sub(1))
+                    + self.coord_to_signal(x, y + 1))
+                    / 4.0) as u8
+    }
+
+        pub fn oblique_cross_matrix(&mut self, x:u32, y:u32)->u8{
+                   ((self.coord_to_signal(x.saturating_sub(1), y.saturating_sub(1))
+                    + self.coord_to_signal(x + 1, y + 1)
+                    + self.coord_to_signal(x + 1, y.saturating_sub(1))
+                    + self.coord_to_signal(x.saturating_sub(1), y + 1))
+                    / 4.0) as u8
+    }
+
+    pub fn horizontal_matrix(&mut self, x:u32, y:u32)->u8{
+        ((self.coord_to_signal(x.saturating_sub(1), y) + self.coord_to_signal(x+1, y)) /2.0) as u8
+
+    }
+
+    pub fn vertical_matrix(&mut self, x:u32, y:u32)->u8{
+        ((self.coord_to_signal(x, y.saturating_sub(1)) + self.coord_to_signal(x, y+1)) /2.0) as u8
+    }
+
+    pub fn bayer_dematricing(&mut self, x: u32, y: u32, pixel_color: u8) -> (u8, u8, u8) {
+        let (mut r, mut g, mut b)= (0, 0, 0);
+        
+        match pixel_color {
+            // Red
+                // B G B    R G R
+                // G R G or G B G
+                // B G B    R G R
+            0 => {
+                r = self.coord_to_signal(x, y) as u8;
+                g = self.straight_cross_matrix(x, y);
+                b = self.oblique_cross_matrix(x, y);
+            }
+            1 => {
+                g = self.coord_to_signal(x, y) as u8;
+                if y % 2 == 0 {
+                    b = self.vertical_matrix(x, y);
+                    r = self.horizontal_matrix(x, y);
+                } else {
+                    b = self.horizontal_matrix(x, y);
+                    r = self.vertical_matrix(x, y);
+                }
+            }
+            // B G B    R G R
+            // G R G or G B G
+            // B G B    R G R
+            2 => {
+                r = self.oblique_cross_matrix(x, y);
+                g = self.straight_cross_matrix(x, y);
+                b = self.coord_to_signal(x, y) as u8;
+            }
+            _ => {}
+        };
+
+        return (r, g, b);
+    }
+
     pub fn make_file(&self) {
         // Write the contents of this image to the Writer in PNG format.
 
         self.destination_image_buffer.save("test.png").unwrap();
     }
 }
-
-
 
 // r = columns[x as usize][y as usize] as u8;
 // g = columns[x as usize][y as usize] as u8;
@@ -365,58 +423,6 @@ impl Processor {
 //             + columns[x][y + 1])
 //             / 4.0) as u8;
 //         b = columns[x][y] as u8;
-//     }
-//     _ => {}
-// }
-
-// match color {
-//     // Red
-//     0 => {
-//         r = signal[((x * width) + y) as usize] as u8;
-//         g = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
-//             + signal[((x + 1) * width + (y)) as usize]
-//             + signal[((x) * width + (y.saturating_sub(1))) as usize]
-//             + signal[((x) * width + (y + 1)) as usize])
-//             / 4.0) as u8;
-//         b = ((signal[((x.saturating_sub(1)) * width + (y.saturating_sub(1))) as usize]
-//             + signal[((x + 1) * width + (y + 1)) as usize]
-//             + signal[((x + 1) * width + (y.saturating_sub(1))) as usize]
-//             + signal[((x.saturating_sub(1)) * width + (y + 1)) as usize])
-//             / 4.0) as u8;
-//     }
-//     1 => {
-//         g = signal[((x * width) + y) as usize] as u8;
-//         if y % 2 == 0 {
-//             b = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
-//                 + signal[((x + 1) * width + (y)) as usize])
-//                 / 2.0) as u8;
-//             r = ((signal[((x) * width + (y.saturating_sub(1))) as usize]
-//                 + signal[((x) * width + (y + 1)) as usize])
-//                 / 2.0) as u8;
-//         } else {
-//             r = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
-//                 + signal[((x + 1) * width + (y)) as usize])
-//                 / 2.0) as u8;
-//             b = ((signal[((x) * width + (y.saturating_sub(1))) as usize]
-//                 + signal[((x) * width + (y + 1)) as usize])
-//                 / 2.0) as u8;
-//         }
-//     }
-//     // B G B    R G R
-//     // G R G or G B G
-//     // B G B    R G R
-//     2 => {
-//         r = ((signal[((x.saturating_sub(1)) * width + (y.saturating_sub(1))) as usize]
-//             + signal[((x + 1) * width + (y + 1)) as usize]
-//             + signal[((x + 1) * width + (y.saturating_sub(1))) as usize]
-//             + signal[((x.saturating_sub(1)) * width + (y + 1)) as usize])
-//             / 4.0) as u8;
-//         g = ((signal[((x.saturating_sub(1)) * width + (y)) as usize]
-//             + signal[((x + 1) * width + (y)) as usize]
-//             + signal[((x) * width + (y.saturating_sub(1))) as usize]
-//             + signal[((x) * width + (y + 1)) as usize])
-//             / 4.0) as u8;
-//         b = signal[((x * width) + y) as usize] as u8;
 //     }
 //     _ => {}
 // }
