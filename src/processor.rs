@@ -8,6 +8,7 @@ pub use crate::buffer::DelayLine;
 pub use crate::filter::Biquad;
 pub use crate::filter::FilterType;
 pub use crate::parameters::{AlphaMode, ColorMode, OrderMode, Parameters};
+pub use crate::reverb::Reverb;
 
 // pub use crate::outils;
 
@@ -57,6 +58,8 @@ pub struct Processor {
 
     bayer_matrix: [[i32; 2]; 2],
 
+    reverb: Reverb,
+
     path: String,
 }
 
@@ -84,6 +87,7 @@ impl Processor {
             height: height,
             size: width * height,
             path: in_path.to_string(),
+            reverb: Reverb::new(),
         };
         new.init();
         new
@@ -95,6 +99,7 @@ impl Processor {
 
         self.set_delay();
         self.set_filters();
+        self.set_reverb();
 
         self.number_of_channels = match *self.parameters.alpha_mode.get() {
             AlphaMode::Interleave => 4,
@@ -136,6 +141,7 @@ impl Processor {
     pub fn init(&mut self) {
         self.filter.init(44000.0);
         self.delay.init_delay(1.0, 0.0);
+        self.reverb.init(100.0);
     }
 
     pub fn set_filters(&mut self) {
@@ -152,16 +158,26 @@ impl Processor {
             .set_feedback(self.parameters.delay_feedback.get() as f32 / 1000.0);
     }
 
+    pub fn set_reverb(&mut self) {
+        self.reverb.set_reverb_time(self.parameters.reverb_decay.get() as f32 / 1000.0);
+        self.reverb.dry_wet = self.parameters.reverb_dry_wet.get() as f32 / 100.0;
+    }
+
     fn reset_processing(&mut self) {
         self.filter.flush();
         self.delay
-            .init_delay(1.0, self.parameters.delay_time.get() as f32);
+            .init_delay(1.0, self.parameters.delay_time.get() as f32); // dirty, add a flush function
+        self.reverb.init(100.0);
+        self.set_delay();
+        self.set_filters();
+        self.set_reverb();
     }
 
     fn process_sample(&mut self, sample: f32) -> f32 {
         let mut temp = sample;
         // temp = self.filter.process(temp);
         temp = self.delay.process(temp);
+        temp = self.reverb.process(temp);
         return temp;
     }
 
@@ -171,8 +187,8 @@ impl Processor {
         let mut modulo = 0;
 
         match self.parameters.order_mode.get() {
-            OrderMode::Column => modulo = self.height -1,
-            OrderMode::Row => modulo = self.width -1,
+            OrderMode::Column => modulo = self.height - 1,
+            OrderMode::Row => modulo = self.width - 1,
             _ => {}
         }
 
@@ -192,8 +208,8 @@ impl Processor {
                         bayer_row = !bayer_row;
                     }
 
-
-                    let color_index = self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
+                    let color_index =
+                        self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
                     let pixel_value = pixel[color_index];
 
                     self.signal.push((pixel_value as f32, flag));
@@ -240,7 +256,6 @@ impl Processor {
                 self.reset_processing();
             }
             let temp = self.process_sample(pixel);
-            // let temp = pixel;
             self.processed_picture.push(temp);
         }
     }
@@ -355,8 +370,9 @@ impl Processor {
     // A X A average East West
 
     pub fn horizontal_matrix(&mut self, x: usize, y: usize) -> u8 {
-        ((self.coord_to_processed_signal(x.saturating_sub(1), y) + self.coord_to_processed_signal(x + 1, y)) / 2.0)
-            as u8
+        ((self.coord_to_processed_signal(x.saturating_sub(1), y)
+            + self.coord_to_processed_signal(x + 1, y))
+            / 2.0) as u8
     }
 
     //  A
@@ -364,8 +380,9 @@ impl Processor {
     //  A
 
     pub fn vertical_matrix(&mut self, x: usize, y: usize) -> u8 {
-        ((self.coord_to_processed_signal(x, y.saturating_sub(1)) + self.coord_to_processed_signal(x, y + 1)) / 2.0)
-            as u8
+        ((self.coord_to_processed_signal(x, y.saturating_sub(1))
+            + self.coord_to_processed_signal(x, y + 1))
+            / 2.0) as u8
     }
 
     pub fn bayer_dematricing(&mut self, x: usize, y: usize, pixel_color: usize) -> (u8, u8, u8) {

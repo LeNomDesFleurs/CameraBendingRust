@@ -82,3 +82,11 @@ aaaah, it's probably because I don't compensate the latency
 I would need to throw all first answers from the sum of all latency or something like that
 
 should I add some post processing to enhance the saturation / contrast ?
+
+adding reverb, no result with allpasses, prabably clipping somewhere or something. comb *has* an effect.
+reverb sample rate around 4000 give 400 pixel delay lines
+too much, 300 sample rate is actually way better, 100 even, lower than that I cannot instantiate the delay line, the max time is not handled super well
+
+i'll need to add an init somewhere for the continuous thing
+
+the rt60 is surprisingly sensible, 1 already give you color noise. above 0.2 is not really usable

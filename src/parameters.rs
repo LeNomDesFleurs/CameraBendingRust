@@ -156,6 +156,8 @@ pub struct Parameters {
     pub delay_feedback : Slider,
     pub filter_cutoff : Slider,
     pub filter_resonance : Slider,
+    pub reverb_dry_wet: Slider,
+    pub reverb_decay: Slider,
     pub continuous : Toggle,
 
     pub parameter_amount: u32,
@@ -206,6 +208,8 @@ impl Parameters {
                 continuous : Toggle::new("Continuous", false),
                 filter_cutoff : Slider::new("Cutoff", 20, 100000, 100000, 1000),
                 filter_resonance : Slider::new("Resonance", 1, 2000, 1, 1),
+                reverb_dry_wet : Slider::new("Rev Dry wet", 0, 100, 0, 10),
+                reverb_decay : Slider::new("Rev Decay", 0, 200, 10, 10),
                 parameter_amount: 0,
 
         };
@@ -229,6 +233,8 @@ impl Parameters {
         f(&mut self.delay_feedback);
         f(&mut self.filter_cutoff);
         f(&mut self.filter_resonance );
+        f(&mut self.reverb_dry_wet );
+        f(&mut self.reverb_decay );
         f(&mut self.continuous );
     }
 }
