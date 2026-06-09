@@ -70,3 +70,15 @@ I did a weird fix on the bayer at some point where I swapped X and Y in the peek
 + composite has a diagonal in the middle for some reason
   
 now that I swapped x and y, bayer suddenly has a weird blooming / saturation effect
+
+seems like filter resonance is not neutral as 1, but more around 10
+
+delay at 1 seems to almost fix the color, probably and index mistake somewhere
+
+disabling processing just to be sure
+k the problems definitely comes from the processing
+problems come from the filter
+aaaah, it's probably because I don't compensate the latency
+I would need to throw all first answers from the sum of all latency or something like that
+
+should I add some post processing to enhance the saturation / contrast ?

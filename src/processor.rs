@@ -160,7 +160,7 @@ impl Processor {
 
     fn process_sample(&mut self, sample: f32) -> f32 {
         let mut temp = sample;
-        temp = self.filter.process(temp);
+        // temp = self.filter.process(temp);
         temp = self.delay.process(temp);
         return temp;
     }
@@ -240,6 +240,7 @@ impl Processor {
                 self.reset_processing();
             }
             let temp = self.process_sample(pixel);
+            // let temp = pixel;
             self.processed_picture.push(temp);
         }
     }
@@ -254,8 +255,8 @@ impl Processor {
             OrderMode::Row => {
                 let mut dest: &ImageBuffer<Rgba<u8>, Vec<u8>> = &self.destination_image_buffer;
 
-                for y in 0..self.width as usize {
-                    for x in 0..self.height as usize {
+                for y in 0..self.height as usize {
+                    for x in 0..self.width as usize {
                         match self.parameters.color_mode.get() {
                             ColorMode::Interleaved => {
                                 let r = self.processed_picture[count] as u8;
@@ -324,7 +325,7 @@ impl Processor {
     }
 
     pub fn coord_to_processed_signal(&mut self, x: usize, y: usize) -> f32 {
-        let index = ((x as usize) + y * self.height as usize) as usize % self.signal.len();
+        let index = ((x as usize) + y * self.width as usize) as usize % self.signal.len();
         return self.processed_picture[index] as f32;
     }
 
