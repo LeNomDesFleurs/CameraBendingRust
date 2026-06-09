@@ -1,0 +1,7 @@
+Delay Zero broken
+
+currently integreting a bit mask feature
+
+start by adding it to the processor
+try & and |, give the parameter value as mask ? 0->127
+adding only on the composite mode for now

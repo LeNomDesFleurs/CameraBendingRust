@@ -143,19 +143,19 @@ impl Processor {
             color_layer = 4
         };
         let mut modulo = 0;
-        match self.parameters.order_mode.get(){
-            OrderMode::Column=>{modulo = self.height}
-            OrderMode::Row=>{modulo = self.width}
-            _=>{}
+        match self.parameters.order_mode.get() {
+            OrderMode::Column => modulo = self.height,
+            OrderMode::Row => modulo = self.width,
+            _ => {}
         }
         match self.parameters.color_mode.get() {
             ColorMode::Bayer => {}
             ColorMode::Interleaved => {
                 for pixel in self.ordered_picture.clone() {
                     let mut flag = Flag::Continue;
-                    if self.parameters.continuous.value == false && count % modulo == 0{
-                            flag = Flag::Reset
-                        }
+                    if self.parameters.continuous.value == false && count % modulo == 0 {
+                        flag = Flag::Reset
+                    }
                     for i in 0..color_layer {
                         self.signal.push((pixel[i] as f32, flag));
                         flag = Flag::Continue //dirty
@@ -167,9 +167,8 @@ impl Processor {
             ColorMode::Composite => {
                 for i in 0..color_layer {
                     for pixel in self.ordered_picture.clone() {
-
                         let mut flag = Flag::Continue;
-                        if self.parameters.continuous.value == false && count % modulo == 0{
+                        if self.parameters.continuous.value == false && count % modulo == 0 {
                             flag = Flag::Reset
                         }
                         self.signal.push((pixel[i] as f32, flag));
@@ -180,12 +179,11 @@ impl Processor {
         }
     }
 
-
     fn process_signal(&mut self) {
         self.processed_picture.clear();
 
         for (pixel, flag) in self.signal.clone() {
-            if flag==Flag::Reset{
+            if flag == Flag::Reset {
                 self.reset_processing();
             }
             let temp = self.process_sample(pixel);
@@ -246,9 +244,10 @@ impl Processor {
                                 self.bayer_matrix[(pixel.0 % 2) as usize][(pixel.1 % 2) as usize];
                         }
                         ColorMode::Composite => {
-                            let r = self.processed_picture[count] as u8;
-                            let g = self.processed_picture[count + offset] as u8;
-                            let b = self.processed_picture[count + (offset * 2)] as u8;
+                            let r = self.processed_picture[count] as u8 & 0b1101_1111;
+                            let g = self.processed_picture[count + offset] as u8 & 0b1010_1111;
+                            let b =
+                                self.processed_picture[count + (offset * 2)] as u8 & 0b0101_1101;
                             let mut a = 255;
 
                             match self.parameters.alpha_mode.get() {
