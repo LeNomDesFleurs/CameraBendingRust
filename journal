@@ -43,3 +43,16 @@ I want to borrow different part of the stuct at the same time.
 seems like rust devs have thought [about this](https://doc.rust-lang.org/nomicon/borrow-splitting.html)
 
 I'll need to ask a rust pro
+
+Let's unfuck bayer matricing for the nonante time.
+
+currently I have a big diagonal at the middle that is flipped when modifying the bayer construction boolean positions
+
+switching column to true fix the color problem on half the picture
+
+ah, I think it must be the modulo that is offseted by one pixel per line, and because the image is square it makes a diagonal, it has no relation ship to x and y.
+
+indeed modulo was not zero based.
+
+lezgong it's fixed
+

@@ -171,15 +171,15 @@ impl Processor {
         let mut modulo = 0;
 
         match self.parameters.order_mode.get() {
-            OrderMode::Column => modulo = self.height,
-            OrderMode::Row => modulo = self.width,
+            OrderMode::Column => modulo = self.height -1,
+            OrderMode::Row => modulo = self.width -1,
             _ => {}
         }
 
         match self.parameters.color_mode.get() {
             ColorMode::Bayer => {
-                let mut bayer_row = false;
-                let mut bayer_column = false;
+                let mut bayer_row = true;
+                let mut bayer_column = true;
                 // alternate between GR and BG, allow for more modularity instead of building the bayer at the ordering stage with a classic array indexing
                 for pixel in self.ordered_picture.clone() {
                     // match color {
@@ -193,8 +193,7 @@ impl Processor {
                         flag = Flag::Reset
                     }
 
-                    let color_index =
-                        self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
+                    let color_index = self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
                     let pixel_value = pixel[color_index];
 
                     self.signal.push((pixel_value as f32, flag));
@@ -253,81 +252,84 @@ impl Processor {
 
         match self.parameters.order_mode.get() {
             OrderMode::Row => {
-
                 let mut dest: &ImageBuffer<Rgba<u8>, Vec<u8>> = &self.destination_image_buffer;
 
                 for x in 0..self.width as usize {
-                    for y in 0..self.height as usize{
-                        
-                                            match self.parameters.color_mode.get() {
-                                                ColorMode::Interleaved => {
-                                                    let r = self.processed_picture[count] as u8;
-                                                    let g = self.processed_picture[count + 1] as u8;
-                                                    let b = self.processed_picture[count + 2] as u8;
-                                                    let a = match self.parameters.alpha_mode.get() {
-                                                        AlphaMode::Delete => 255 as u8,
-                                                        AlphaMode::Interleave => self.processed_picture[count + 3] as u8,
-                                                        AlphaMode::Preserve => {
-                                                            
-                                                            self.source_image_buffer.get_pixel(x as u32, y as u32)[3] as u8
-                                                        }
-                                                    };
-                        
-                                                    *self.destination_image_buffer.get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
-                                                    count = count + self.number_of_channels;
-                                                }
-                                                ColorMode::Bayer => {
-                                                    let color = self.bayer_matrix[x % 2][y % 2] as usize;
-                                                    let (r, g, b) = self.bayer_dematricing(x, y, color);
-                                                    let a = match self.parameters.alpha_mode.get() {
-                                                        AlphaMode::Delete => 255 as u8,
-                                                        AlphaMode::Interleave => 255, // To do, 4 color marticing ?
-                                                        AlphaMode::Preserve => {
-                                                            self.source_image_buffer.get_pixel(x as u32, y as u32)[3] as u8
-                                                        }
-                                                    };
-                                                    *self.destination_image_buffer.get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
-                                                    count = count + 1;
-                                                }
-                                                ColorMode::Composite => {
-                                                    let r = self.processed_picture[count] as u8;
-                                                    let g = self.processed_picture[count + offset] as u8;
-                                                    let b = self.processed_picture[count + (offset * 2)] as u8;
-                                                    let mut a = 255;
-                        
-                                                    match self.parameters.alpha_mode.get() {
-                                                        AlphaMode::Delete => {}
-                                                        AlphaMode::Interleave => {
-                                                            a = self.processed_picture[count + (offset * 3)] as u8;
-                                                        }
-                                                        AlphaMode::Preserve => {
-                                                            a = self.source_image_buffer[(x as u32, y as u32)].0[3];
-                                                        }
-                                                    }
-                        
-                                                    *self.destination_image_buffer.get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
-                                                    count = count + 1;
-                                                }
-                                            }
+                    for y in 0..self.height as usize {
+                        match self.parameters.color_mode.get() {
+                            ColorMode::Interleaved => {
+                                let r = self.processed_picture[count] as u8;
+                                let g = self.processed_picture[count + 1] as u8;
+                                let b = self.processed_picture[count + 2] as u8;
+                                let a = match self.parameters.alpha_mode.get() {
+                                    AlphaMode::Delete => 255 as u8,
+                                    AlphaMode::Interleave => {
+                                        self.processed_picture[count + 3] as u8
+                                    }
+                                    AlphaMode::Preserve => {
+                                        self.source_image_buffer.get_pixel(x as u32, y as u32)[3]
+                                            as u8
+                                    }
+                                };
 
+                                *self
+                                    .destination_image_buffer
+                                    .get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
+                                count = count + self.number_of_channels;
+                            }
+                            ColorMode::Bayer => {
+                                let color = self.bayer_matrix[x % 2][y % 2] as usize;
+                                let (r, g, b) = self.bayer_dematricing(x, y, color);
+                                let a = match self.parameters.alpha_mode.get() {
+                                    AlphaMode::Delete => 255 as u8,
+                                    AlphaMode::Interleave => 255, // To do, 4 color marticing ?
+                                    AlphaMode::Preserve => {
+                                        self.source_image_buffer.get_pixel(x as u32, y as u32)[3]
+                                            as u8
+                                    }
+                                };
+                                *self
+                                    .destination_image_buffer
+                                    .get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
+                                count = count + 1;
+                            }
+                            ColorMode::Composite => {
+                                let r = self.processed_picture[count] as u8;
+                                let g = self.processed_picture[count + offset] as u8;
+                                let b = self.processed_picture[count + (offset * 2)] as u8;
+                                let mut a = 255;
+
+                                match self.parameters.alpha_mode.get() {
+                                    AlphaMode::Delete => {}
+                                    AlphaMode::Interleave => {
+                                        a = self.processed_picture[count + (offset * 3)] as u8;
+                                    }
+                                    AlphaMode::Preserve => {
+                                        a = self.source_image_buffer[(x as u32, y as u32)].0[3];
+                                    }
+                                }
+
+                                *self
+                                    .destination_image_buffer
+                                    .get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
+                                count = count + 1;
+                            }
+                        }
                     }
                 }
-                
             }
             OrderMode::Column => {}
             _ => {}
         }
-        }
-    
+    }
 
     pub fn coord_to_signal(&mut self, x: usize, y: usize) -> f32 {
-
         let index = ((x as usize) + y * self.height as usize) as usize % self.signal.len();
         return self.signal[index].0 as f32;
     }
 
     //   A
-    // A X A average NESW
+    // A X A average North East South West
     //   A
     // this could be done by conbining the two horizontal and vertical dematricing
     pub fn straight_cross_matrix(&mut self, x: usize, y: usize) -> u8 {
@@ -349,7 +351,7 @@ impl Processor {
             / 4.0) as u8
     }
 
-    // A X A
+    // A X A average East West
 
     pub fn horizontal_matrix(&mut self, x: usize, y: usize) -> u8 {
         ((self.coord_to_signal(x.saturating_sub(1), y) + self.coord_to_signal(x + 1, y)) / 2.0)
@@ -357,7 +359,7 @@ impl Processor {
     }
 
     //  A
-    //  X
+    //  X average North South
     //  A
 
     pub fn vertical_matrix(&mut self, x: usize, y: usize) -> u8 {
@@ -379,9 +381,9 @@ impl Processor {
                 b = self.oblique_cross_matrix(x, y);
             }
 
-            // Green         
+            // Green
             // G B G        G R G
-            // R G R   or   B G B     thus the if statement 
+            // R G R   or   B G B     thus the if statement
             // G B G        G R G
             1 => {
                 g = self.coord_to_signal(x, y) as u8;
