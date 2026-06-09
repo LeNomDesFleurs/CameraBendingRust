@@ -356,14 +356,19 @@ impl Processor {
 
         match pixel_color {
             // Red
-            // B G B    R G R
-            // G R G or G B G
-            // B G B    R G R
+            // B G B  B is oblique
+            // G R G  G is straight
+            // B G B
             0 => {
                 r = self.coord_to_signal(x, y) as u8;
                 g = self.straight_cross_matrix(x, y);
                 b = self.oblique_cross_matrix(x, y);
             }
+
+            // Green         
+            // G B G        G R G
+            // R G R   or   B G B     thus the if statement 
+            // G B G        G R G
             1 => {
                 g = self.coord_to_signal(x, y) as u8;
                 if y % 2 == 0 {
@@ -374,9 +379,9 @@ impl Processor {
                     r = self.vertical_matrix(x, y);
                 }
             }
-            // B G B    R G R
-            // G R G or G B G
-            // B G B    R G R
+            // R G R   R is oblique
+            // G B G   G is straight
+            // R G R
             2 => {
                 r = self.oblique_cross_matrix(x, y);
                 g = self.straight_cross_matrix(x, y);
