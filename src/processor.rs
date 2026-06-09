@@ -254,8 +254,8 @@ impl Processor {
             OrderMode::Row => {
                 let mut dest: &ImageBuffer<Rgba<u8>, Vec<u8>> = &self.destination_image_buffer;
 
-                for x in 0..self.width as usize {
-                    for y in 0..self.height as usize {
+                for y in 0..self.width as usize {
+                    for x in 0..self.height as usize {
                         match self.parameters.color_mode.get() {
                             ColorMode::Interleaved => {
                                 let r = self.processed_picture[count] as u8;

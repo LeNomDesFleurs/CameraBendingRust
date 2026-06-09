@@ -61,3 +61,12 @@ image is not modified when changing parameters
 maybe reset at each pixel ? check flag
 nope, even it continous mode it doesn't work
 was not indexing the correct picture lmao
+
+## Not in the right angle 
+
+I did a weird fix on the bayer at some point where I swapped X and Y in the peeking function, seems that now the problem is also preset 
+
++ interleaved color problem
++ composite has a diagonal in the middle for some reason
+  
+now that I swapped x and y, bayer suddenly has a weird blooming / saturation effect
