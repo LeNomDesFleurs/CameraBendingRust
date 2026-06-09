@@ -56,3 +56,8 @@ indeed modulo was not zero based.
 
 lezgong it's fixed
 
+Signal is not processed in bayer mode ???
+image is not modified when changing parameters
+maybe reset at each pixel ? check flag
+nope, even it continous mode it doesn't work
+was not indexing the correct picture lmao

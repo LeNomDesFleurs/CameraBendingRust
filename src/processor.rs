@@ -184,14 +184,14 @@ impl Processor {
                 for pixel in self.ordered_picture.clone() {
                     // match color {
                     let mut flag = Flag::Continue;
+                    if self.parameters.continuous.value == false && count % modulo == 0 {
+                        flag = Flag::Reset
+                    }
                     if count > modulo {
                         count = 0;
                         bayer_row = !bayer_row;
                     }
 
-                    if self.parameters.continuous.value == false && count % modulo == 0 {
-                        flag = Flag::Reset
-                    }
 
                     let color_index = self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
                     let pixel_value = pixel[color_index];
@@ -323,9 +323,9 @@ impl Processor {
         }
     }
 
-    pub fn coord_to_signal(&mut self, x: usize, y: usize) -> f32 {
+    pub fn coord_to_processed_signal(&mut self, x: usize, y: usize) -> f32 {
         let index = ((x as usize) + y * self.height as usize) as usize % self.signal.len();
-        return self.signal[index].0 as f32;
+        return self.processed_picture[index] as f32;
     }
 
     //   A
@@ -333,10 +333,10 @@ impl Processor {
     //   A
     // this could be done by conbining the two horizontal and vertical dematricing
     pub fn straight_cross_matrix(&mut self, x: usize, y: usize) -> u8 {
-        ((self.coord_to_signal(x.saturating_sub(1), y)
-            + self.coord_to_signal(x + 1, y)
-            + self.coord_to_signal(x, y.saturating_sub(1))
-            + self.coord_to_signal(x, y + 1))
+        ((self.coord_to_processed_signal(x.saturating_sub(1), y)
+            + self.coord_to_processed_signal(x + 1, y)
+            + self.coord_to_processed_signal(x, y.saturating_sub(1))
+            + self.coord_to_processed_signal(x, y + 1))
             / 4.0) as u8
     }
 
@@ -344,17 +344,17 @@ impl Processor {
     //  X   average angles
     //A   A
     pub fn oblique_cross_matrix(&mut self, x: usize, y: usize) -> u8 {
-        ((self.coord_to_signal(x.saturating_sub(1), y.saturating_sub(1))
-            + self.coord_to_signal(x + 1, y + 1)
-            + self.coord_to_signal(x + 1, y.saturating_sub(1))
-            + self.coord_to_signal(x.saturating_sub(1), y + 1))
+        ((self.coord_to_processed_signal(x.saturating_sub(1), y.saturating_sub(1))
+            + self.coord_to_processed_signal(x + 1, y + 1)
+            + self.coord_to_processed_signal(x + 1, y.saturating_sub(1))
+            + self.coord_to_processed_signal(x.saturating_sub(1), y + 1))
             / 4.0) as u8
     }
 
     // A X A average East West
 
     pub fn horizontal_matrix(&mut self, x: usize, y: usize) -> u8 {
-        ((self.coord_to_signal(x.saturating_sub(1), y) + self.coord_to_signal(x + 1, y)) / 2.0)
+        ((self.coord_to_processed_signal(x.saturating_sub(1), y) + self.coord_to_processed_signal(x + 1, y)) / 2.0)
             as u8
     }
 
@@ -363,7 +363,7 @@ impl Processor {
     //  A
 
     pub fn vertical_matrix(&mut self, x: usize, y: usize) -> u8 {
-        ((self.coord_to_signal(x, y.saturating_sub(1)) + self.coord_to_signal(x, y + 1)) / 2.0)
+        ((self.coord_to_processed_signal(x, y.saturating_sub(1)) + self.coord_to_processed_signal(x, y + 1)) / 2.0)
             as u8
     }
 
@@ -376,7 +376,7 @@ impl Processor {
             // G R G  G is straight
             // B G B
             0 => {
-                r = self.coord_to_signal(x, y) as u8;
+                r = self.coord_to_processed_signal(x, y) as u8;
                 g = self.straight_cross_matrix(x, y);
                 b = self.oblique_cross_matrix(x, y);
             }
@@ -386,7 +386,7 @@ impl Processor {
             // R G R   or   B G B     thus the if statement
             // G B G        G R G
             1 => {
-                g = self.coord_to_signal(x, y) as u8;
+                g = self.coord_to_processed_signal(x, y) as u8;
                 if y % 2 == 0 {
                     b = self.vertical_matrix(x, y);
                     r = self.horizontal_matrix(x, y);
@@ -401,7 +401,7 @@ impl Processor {
             2 => {
                 r = self.oblique_cross_matrix(x, y);
                 g = self.straight_cross_matrix(x, y);
-                b = self.coord_to_signal(x, y) as u8;
+                b = self.coord_to_processed_signal(x, y) as u8;
             }
             _ => {}
         };
