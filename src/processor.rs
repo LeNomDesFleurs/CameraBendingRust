@@ -253,7 +253,7 @@ impl Processor {
         let offset = len / self.number_of_channels;
         match self.parameters.order_mode.get() {
             OrderMode::Row => {
-                let mut dest: &ImageBuffer<Rgba<u8>, Vec<u8>> =  & self.destination_image_buffer;
+                let mut dest: &ImageBuffer<Rgba<u8>, Vec<u8>> = &self.destination_image_buffer;
                 for (xu, yu, pixel) in dest.enumerate_pixels_mut() {
                     let x = xu.saturating_sub(1) as usize;
                     let y = yu.saturating_sub(1) as usize;
@@ -276,11 +276,10 @@ impl Processor {
                             count = count + self.number_of_channels;
                         }
                         ColorMode::Bayer => {
-                            let color =
-                                self.bayer_matrix[x % 2][y % 2] as usize;
-                                let (r, g, b) = self.bayer_dematricing(x, y, color);
-                                *pixel = image::Rgba([r, g, b, 127]);
-                                count = count + 1;
+                            let color = self.bayer_matrix[x % 2][y % 2] as usize;
+                            let (r, g, b) = self.bayer_dematricing(x, y, color);
+                            *pixel = image::Rgba([r, g, b, 127]);
+                            count = count + 1;
                         }
                         ColorMode::Composite => {
                             let r = self.processed_picture[count] as u8;
@@ -313,41 +312,53 @@ impl Processor {
         return self.signal[((x * self.width as usize) + y) as usize].0 as f32;
     }
 
-
-   
-    pub fn straight_cross_matrix(&mut self, x:usize, y:usize)->u8{
-                    ((self.coord_to_signal(x.saturating_sub(1), y)
-                    + self.coord_to_signal(x + 1, y)
-                    + self.coord_to_signal(x, y.saturating_sub(1))
-                    + self.coord_to_signal(x, y + 1))
-                    / 4.0) as u8
+    //   A
+    // A X A average NESW
+    //   A
+    // this could be done by conbining the two horizontal and vertical dematricing
+    pub fn straight_cross_matrix(&mut self, x: usize, y: usize) -> u8 {
+        ((self.coord_to_signal(x.saturating_sub(1), y)
+            + self.coord_to_signal(x + 1, y)
+            + self.coord_to_signal(x, y.saturating_sub(1))
+            + self.coord_to_signal(x, y + 1))
+            / 4.0) as u8
     }
 
-        pub fn oblique_cross_matrix(&mut self, x:usize, y:usize)->u8{
-                   ((self.coord_to_signal(x.saturating_sub(1), y.saturating_sub(1))
-                    + self.coord_to_signal(x + 1, y + 1)
-                    + self.coord_to_signal(x + 1, y.saturating_sub(1))
-                    + self.coord_to_signal(x.saturating_sub(1), y + 1))
-                    / 4.0) as u8
+    //A   A
+    //  X   average angles
+    //A   A
+    pub fn oblique_cross_matrix(&mut self, x: usize, y: usize) -> u8 {
+        ((self.coord_to_signal(x.saturating_sub(1), y.saturating_sub(1))
+            + self.coord_to_signal(x + 1, y + 1)
+            + self.coord_to_signal(x + 1, y.saturating_sub(1))
+            + self.coord_to_signal(x.saturating_sub(1), y + 1))
+            / 4.0) as u8
     }
 
-    pub fn horizontal_matrix(&mut self, x:usize, y:usize)->u8{
-        ((self.coord_to_signal(x.saturating_sub(1), y) + self.coord_to_signal(x+1, y)) /2.0) as u8
+    // A X A
 
+    pub fn horizontal_matrix(&mut self, x: usize, y: usize) -> u8 {
+        ((self.coord_to_signal(x.saturating_sub(1), y) + self.coord_to_signal(x + 1, y)) / 2.0)
+            as u8
     }
 
-    pub fn vertical_matrix(&mut self, x:usize, y:usize)->u8{
-        ((self.coord_to_signal(x, y.saturating_sub(1)) + self.coord_to_signal(x, y+1)) /2.0) as u8
+    //  A
+    //  X
+    //  A
+
+    pub fn vertical_matrix(&mut self, x: usize, y: usize) -> u8 {
+        ((self.coord_to_signal(x, y.saturating_sub(1)) + self.coord_to_signal(x, y + 1)) / 2.0)
+            as u8
     }
 
     pub fn bayer_dematricing(&mut self, x: usize, y: usize, pixel_color: usize) -> (u8, u8, u8) {
-        let (mut r, mut g, mut b)= (0, 0, 0);
-        
+        let (mut r, mut g, mut b) = (0, 0, 0);
+
         match pixel_color {
             // Red
-                // B G B    R G R
-                // G R G or G B G
-                // B G B    R G R
+            // B G B    R G R
+            // G R G or G B G
+            // B G B    R G R
             0 => {
                 r = self.coord_to_signal(x, y) as u8;
                 g = self.straight_cross_matrix(x, y);
