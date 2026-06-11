@@ -7,13 +7,16 @@
 - [ ] index picture / create a hash with parameter
     - [ ] use the parameters as argument for input
 - [ ] collumn
+- [ ] latency compensation
+- [x] optimize signal constuction, don't redo it if the parameters haven't changed
 
 ## BUG
 
 - [x] feedback broken
-- [ ] interleaved broken 
+- [x] interleaved broken 
     count was update 1 by 1 instead of 4 by 4
-- [ ] preserve in interleaved broken
+- [x] preserve in interleaved broken
+- [x] Diagonal black ray -> flush flagging problem, I reduced the modulo by one for bayer, which created the problem for the interleaved, weird, was probably the fact that the bayer modification and reset flag where not set at the same time
 
 ## Journal
 
@@ -90,3 +93,28 @@ too much, 300 sample rate is actually way better, 100 even, lower than that I ca
 i'll need to add an init somewhere for the continuous thing
 
 the rt60 is surprisingly sensible, 1 already give you color noise. above 0.2 is not really usable
+
+## bayer color broken again
+
+I'm going crazy
+seems a lot like the green and red are swapped
+swapping it at dematricing make like look almost correct, but the picture is heavily desaturated
+I tried on touch, and indeed it seems like the green and red are swapped, but they're swapped only on one of the two green pixels I think, like if one row of two had a 1 pixel offset
+
+okay, back with the blue rose
+
+omg it's back
+weiiiird, i needed to swap both the rows of the matrix and the bayer boolean used to signalize. didn't really understood what I just did
+
+....
+I think I just build the picture in composite by accident
+fuuuuuuuuuuuuuu
+
+there mmust be an incoherence between the bayer color selected at construction, and the bayer color selected at dematricing
+
+ok count % modulo = 0 was trigging at the first occurence, pretty dumb mistake, should be better
+rose blue again
+also, the matrix is flipped in terms of rows
+like array[x][y] is actually array[y][x]
+because it's instantiated as [[0, 1], [2, 0]]
+thus the first index selects the y, and the second the x

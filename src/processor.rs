@@ -61,6 +61,8 @@ pub struct Processor {
     reverb: Reverb,
 
     path: String,
+
+    signal_built: bool,
 }
 
 impl Processor {
@@ -76,7 +78,9 @@ impl Processor {
             signal: Vec::new(),
             filter: Biquad::new(FilterType::LPF),
             delay: DelayLine::new(1000.0, buffer::DelayMode::Comb),
-            bayer_matrix: [[1, 2], [0, 1]],
+            bayer_matrix: [[1, 0], [2, 1]],
+            // [ G ; R ]
+            // [ B ; G ]
             ordered_picture: Vec::new(),
             processed_picture: Vec::new(),
             number_of_channels: 3,
@@ -88,6 +92,7 @@ impl Processor {
             size: width * height,
             path: in_path.to_string(),
             reverb: Reverb::new(),
+            signal_built: false,
         };
         new.init();
         new
@@ -95,6 +100,10 @@ impl Processor {
 
     /// Main function orchestrating everything else
     pub fn process_image(&mut self, parameters: &Parameters) {
+        // only reconstructed signal if signal construction related parameters have changed
+        let reconstruction_needed: bool = (self.parameters.color_mode.get()
+            != parameters.color_mode.get())
+            || (self.parameters.order_mode.get() != parameters.order_mode.get());
         self.parameters = *parameters;
 
         self.set_delay();
@@ -105,10 +114,14 @@ impl Processor {
             AlphaMode::Interleave => 4,
             _ => 3,
         };
-        // make an signal out of the picture, from 2d to 1d
-        self.order_signal(); // Vec<Vec<rgb>>
-                             // organize colors in multiple signals, or interleave them all in one signal
-        self.split_colors(); // Vec<f32>
+
+        if reconstruction_needed || !self.signal_built {
+            // make an signal out of the picture, from 2d to 1d
+            self.order_signal(); // Vec<Vec<rgb>>
+                                 // organize colors in multiple signals, or interleave them all in one signal
+            self.split_colors(); // Vec<f32>
+            self.signal_built = true;
+        }
         self.process_signal(); // Vec<f32>
         self.reconstruct_image();
         self.make_file();
@@ -159,7 +172,8 @@ impl Processor {
     }
 
     pub fn set_reverb(&mut self) {
-        self.reverb.set_reverb_time(self.parameters.reverb_decay.get() as f32 / 1000.0);
+        self.reverb
+            .set_reverb_time(self.parameters.reverb_decay.get() as f32 / 1000.0);
         self.reverb.dry_wet = self.parameters.reverb_dry_wet.get() as f32 / 100.0;
     }
 
@@ -187,29 +201,32 @@ impl Processor {
         let mut modulo = 0;
 
         match self.parameters.order_mode.get() {
-            OrderMode::Column => modulo = self.height - 1,
-            OrderMode::Row => modulo = self.width - 1,
+            OrderMode::Column => modulo = self.height,
+            OrderMode::Row => modulo = self.width,
             _ => {}
         }
 
         match self.parameters.color_mode.get() {
             ColorMode::Bayer => {
-                let mut bayer_row = true;
-                let mut bayer_column = true;
+                let mut bayer_row = false;
+                let mut bayer_column = false;
                 // alternate between GR and BG, allow for more modularity instead of building the bayer at the ordering stage with a classic array indexing
+                // TODO should probably replace this cloning by a reference, optim
                 for pixel in self.ordered_picture.clone() {
                     // match color {
                     let mut flag = Flag::Continue;
-                    if self.parameters.continuous.value == false && count % modulo == 0 {
-                        flag = Flag::Reset
-                    }
-                    if count > modulo {
+                    if count == modulo {
+                        if self.parameters.continuous.value == false {
+                            flag = Flag::Reset;
+                        }
                         count = 0;
                         bayer_row = !bayer_row;
                     }
 
+                    let x = bayer_row as usize;
+                    let y = bayer_column as usize;
                     let color_index =
-                        self.bayer_matrix[bayer_row as usize][bayer_column as usize] as usize;
+                        self.bayer_matrix[y][x] as usize;
                     let pixel_value = pixel[color_index];
 
                     self.signal.push((pixel_value as f32, flag));
@@ -294,7 +311,7 @@ impl Processor {
                                 count = count + self.number_of_channels;
                             }
                             ColorMode::Bayer => {
-                                let color = self.bayer_matrix[x % 2][y % 2] as usize;
+                                let color = self.bayer_matrix[y % 2][x % 2] as usize;
                                 let (r, g, b) = self.bayer_dematricing(x, y, color);
                                 let a = match self.parameters.alpha_mode.get() {
                                     AlphaMode::Delete => 255 as u8,
@@ -340,6 +357,7 @@ impl Processor {
     }
 
     pub fn coord_to_processed_signal(&mut self, x: usize, y: usize) -> f32 {
+        // pixels are stored left to right, top to bottom, thus the column offset is y times the number of pixel in a row
         let index = ((x as usize) + y * self.width as usize) as usize % self.signal.len();
         return self.processed_picture[index] as f32;
     }
@@ -389,11 +407,16 @@ impl Processor {
         let (mut r, mut g, mut b) = (0, 0, 0);
 
         match pixel_color {
+
+            // red and blue indexes are flipped
+            // don't ask
+            // I'm tired
+
             // Red
             // B G B  B is oblique
             // G R G  G is straight
             // B G B
-            0 => {
+            2 => {
                 r = self.coord_to_processed_signal(x, y) as u8;
                 g = self.straight_cross_matrix(x, y);
                 b = self.oblique_cross_matrix(x, y);
@@ -405,18 +428,18 @@ impl Processor {
             // G B G        G R G
             1 => {
                 g = self.coord_to_processed_signal(x, y) as u8;
-                if y % 2 == 0 {
-                    b = self.vertical_matrix(x, y);
+                if y % 2 == 1 {
                     r = self.horizontal_matrix(x, y);
+                    b = self.vertical_matrix(x, y);
                 } else {
-                    b = self.horizontal_matrix(x, y);
                     r = self.vertical_matrix(x, y);
+                    b = self.horizontal_matrix(x, y);
                 }
             }
             // R G R   R is oblique
             // G B G   G is straight
             // R G R
-            2 => {
+            0 => {
                 r = self.oblique_cross_matrix(x, y);
                 g = self.straight_cross_matrix(x, y);
                 b = self.coord_to_processed_signal(x, y) as u8;

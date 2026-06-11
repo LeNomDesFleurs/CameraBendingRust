@@ -124,7 +124,7 @@ impl Parameter for Toggle {
 
 
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum ColorMode{
     Bayer,
     Interleaved,
@@ -138,7 +138,7 @@ pub enum AlphaMode{
     Interleave, //does nothing in bayer mode
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum OrderMode{
     Column,
     Row,
