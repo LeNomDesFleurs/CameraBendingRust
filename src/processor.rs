@@ -1,6 +1,4 @@
-use crossterm::style::Color;
 use image::ImageBuffer;
-use image::Rgb;
 use image::Rgba;
 
 use crate::buffer;
@@ -51,24 +49,16 @@ pub struct Processor {
     size: u32,
 
     number_of_channels: usize, //usize because used as index
-
     source_image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>>,
-
     destination_image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>>,
-
     bayer_matrix: [[i32; 2]; 2],
-
     reverb: Reverb,
-
-    path: String,
-
     signal_built: bool,
 }
 
 impl Processor {
-    pub fn new(in_path: &str, parameters: &Parameters) -> Self {
-        let dynimg = image::open(in_path).unwrap();
-        let mut bufimg = dynimg.into_rgba8();
+    pub fn new(input_image: ImageBuffer<Rgba<u8>, Vec<u8>>, parameters: &Parameters) -> Self {
+        let mut bufimg = input_image;
         let height = bufimg.dimensions().1;
         let width = bufimg.dimensions().0;
         let mut new = Self {
@@ -90,7 +80,6 @@ impl Processor {
             width: width,
             height: height,
             size: width * height,
-            path: in_path.to_string(),
             reverb: Reverb::new(),
             signal_built: false,
         };
@@ -99,7 +88,7 @@ impl Processor {
     }
 
     /// Main function orchestrating everything else
-    pub fn process_image(&mut self, parameters: &Parameters) {
+    pub fn process_image(&mut self, parameters: &Parameters)-> ImageBuffer<Rgba<u8>, Vec<u8>> {
         // only reconstructed signal if signal construction related parameters have changed
         let reconstruction_needed: bool = (self.parameters.color_mode.get()
             != parameters.color_mode.get())
@@ -124,7 +113,7 @@ impl Processor {
         }
         self.process_signal(); // Vec<f32>
         self.reconstruct_image();
-        self.make_file();
+        return self.destination_image_buffer.clone();
     }
 
     /// Make 3 lanes with all pixels depending on the ordering modes
