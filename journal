@@ -118,3 +118,9 @@ also, the matrix is flipped in terms of rows
 like array[x][y] is actually array[y][x]
 because it's instantiated as [[0, 1], [2, 0]]
 thus the first index selects the y, and the second the x
+
+## WASM
+
+I refactored everything to work within a js file
+next step is building said js file with a canvas, a bunch of slider and a process button
+I should be able to get most of the functional and UI things from the wepgpu repo made with guk
