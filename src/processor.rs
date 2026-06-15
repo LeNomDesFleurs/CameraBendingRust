@@ -1,12 +1,91 @@
-use image::ImageBuffer;
-use image::Rgba;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::buffer;
 pub use crate::buffer::DelayLine;
 pub use crate::filter::Biquad;
 pub use crate::filter::FilterType;
-pub use crate::parameters::{AlphaMode, ColorMode, OrderMode, Parameters};
 pub use crate::reverb::Reverb;
+#[derive(PartialEq)]
+enum AlphaMode {
+    Preserve,
+    Delete,
+    Interleave,
+}
+#[derive(PartialEq)]
+enum ColorMode {
+    Composite,
+    Interleaved,
+    Bayer,
+}
+
+#[derive(PartialEq)]
+enum OrderMode {
+    Row,
+    Column,
+    ReverseRow,
+    ReverseColumn,
+}
+
+pub struct Parameters {
+    // signal params
+    pub alpha_mode: AlphaMode,
+    pub color_mode: ColorMode,
+    pub order_mode: OrderMode,
+    pub delay_time: f32,
+    pub delay_feedback: f32,
+    pub filter_cutoff: f32,
+    pub filter_resonance: f32,
+    pub reverb_dry_wet: f32,
+    pub reverb_decay: f32,
+    pub continuous: bool,
+}
+
+impl Parameters {
+    pub fn new(
+        alpha_mode: u32,
+        color_mode: u32,
+        order_mode: u32,
+        delay_time: f32,
+        delay_feedback: f32,
+        filter_cutoff: f32,
+        filter_resonance: f32,
+        reverb_dry_wet: f32,
+        reverb_decay: f32,
+        continuous: bool,
+    ) -> Self {
+        let alpha_mode_enum: AlphaMode = match alpha_mode {
+            0 => AlphaMode::Preserve,
+            1 => AlphaMode::Interleave,
+            2 | _ => AlphaMode::Delete,
+        };
+
+        let order_mode_enum: OrderMode = match order_mode {
+            0 => OrderMode::Row,
+            1 => OrderMode::Column,
+            2 => OrderMode::ReverseRow,
+            3 | _ => OrderMode::ReverseColumn,
+        };
+
+        let color_mode_enum: ColorMode = match color_mode {
+            0 => ColorMode::Composite,
+            1 => ColorMode::Interleaved,
+            2 | _ => ColorMode::Bayer,
+        };
+
+        Self {
+            alpha_mode: alpha_mode_enum,
+            color_mode: color_mode_enum,
+            order_mode: order_mode_enum,
+            delay_time,
+            delay_feedback,
+            filter_cutoff,
+            filter_resonance,
+            reverb_dry_wet,
+            reverb_decay,
+            continuous,
+        }
+    }
+}
 
 // pub use crate::outils;
 
@@ -14,6 +93,51 @@ pub use crate::reverb::Reverb;
 enum Flag {
     Reset,
     Continue,
+}
+
+#[cfg_attr(feature = "enable_wasm", wasm_bindgen)]
+#[derive(Clone, Debug)]
+pub struct Picture {
+    data: Vec<u8>, // interleave rgba for wasm compatibility. processing in f32
+    pub width: usize,
+    pub height: usize,
+}
+
+impl Picture {
+    pub fn new(raw_data: Vec<u8>, width: usize, height: usize) -> Self {
+        Self {
+            data: raw_data,
+            width,
+            height,
+        }
+    }
+
+    pub fn get_pixel(&self, x: usize, y: usize) -> [u8; 4] {
+        let index = self.get_index(x, y);
+        return [
+            self.data[index],
+            self.data[index + 1],
+            self.data[index + 2],
+            self.data[index + 3],
+        ];
+    }
+    pub fn set_pixel(&mut self, x: usize, y: usize, value: [u8; 4]) {
+        let index = self.get_index(x, y);
+        for i in 0..3 {
+            self.data[index + i] = value[i];
+        }
+    }
+    pub fn get_pixel_color(&self, x: usize, y: usize, color_index: usize) -> u8 {
+        let index = self.get_index(x, y) + color_index;
+        self.data[index]
+    }
+    fn get_index(&self, x: usize, y: usize) -> usize {
+        // wrap if to high, no security over under index, I don't want it to fail silently
+        ((x as usize) + y * self.width as usize) as usize % self.data.len()
+    }
+    pub fn get_raw_data(&self) -> Vec<u8> {
+        self.data.clone()
+    }
 }
 
 //TODO add transparency Layer ?
@@ -35,36 +159,36 @@ pub struct Processor {
     //-------------processing-----------------
     quantization: f32,
 
+    source_image_buffer: Picture,
     ordered_picture: Vec<[u8; 4]>,
     signal: Vec<(f32, Flag)>,
     processed_picture: Vec<f32>,
     slices: Vec<Vec<f32>>,
+    output_picture: Picture,
+
     // signal: Signal<f32>,
     filter: Biquad,
     delay: DelayLine,
+    reverb: Reverb,
 
     // ---------------file----------
-    width: u32,
-    height: u32,
-    size: u32,
+    width: usize,
+    height: usize,
+    size: usize,
 
     number_of_channels: usize, //usize because used as index
-    source_image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>>,
-    destination_image_buffer: ImageBuffer<Rgba<u8>, Vec<u8>>,
     bayer_matrix: [[i32; 2]; 2],
-    reverb: Reverb,
     signal_built: bool,
 }
 
 impl Processor {
-    pub fn new(input_image: ImageBuffer<Rgba<u8>, Vec<u8>>, parameters: &Parameters) -> Self {
-        let mut bufimg = input_image;
-        let height = bufimg.dimensions().1;
-        let width = bufimg.dimensions().0;
+    pub fn new(input_image: Picture, parameters: Parameters) -> Self {
+        let bufimg = input_image;
+        let height = bufimg.height;
+        let width = bufimg.width;
         let mut new = Self {
-            parameters: Parameters::new(),
+            parameters: parameters,
             quantization: 0.0,
-            // signal: Signal::InterleavedVector(vec![0.0 as f32, 0.0 as f32]),
             signal: Vec::new(),
             filter: Biquad::new(FilterType::LPF),
             delay: DelayLine::new(1000.0, buffer::DelayMode::Comb),
@@ -76,7 +200,7 @@ impl Processor {
             number_of_channels: 3,
             slices: Vec::new(),
             source_image_buffer: bufimg.clone(),
-            destination_image_buffer: bufimg.clone(),
+            output_picture: bufimg.clone(),
             width: width,
             height: height,
             size: width * height,
@@ -88,55 +212,66 @@ impl Processor {
     }
 
     /// Main function orchestrating everything else
-    pub fn process_image(&mut self, parameters: &Parameters)-> ImageBuffer<Rgba<u8>, Vec<u8>> {
-        // only reconstructed signal if signal construction related parameters have changed
-        let reconstruction_needed: bool = (self.parameters.color_mode.get()
-            != parameters.color_mode.get())
-            || (self.parameters.order_mode.get() != parameters.order_mode.get());
-        self.parameters = *parameters;
-
+    pub fn process_image(&mut self) -> Picture {
         self.set_delay();
         self.set_filters();
         self.set_reverb();
 
-        self.number_of_channels = match *self.parameters.alpha_mode.get() {
+        self.number_of_channels = match self.parameters.alpha_mode {
             AlphaMode::Interleave => 4,
             _ => 3,
         };
 
-        if reconstruction_needed || !self.signal_built {
-            // make an signal out of the picture, from 2d to 1d
-            self.order_signal(); // Vec<Vec<rgb>>
-                                 // organize colors in multiple signals, or interleave them all in one signal
-            self.split_colors(); // Vec<f32>
-            self.signal_built = true;
-        }
+        // make an signal out of the picture, from 2d to 1d
+        self.order_signal(); // Vec<Vec<rgb>>
+                             // organize colors in multiple signals, or interleave them all in one signal
+        self.split_colors(); // Vec<f32>
+        self.signal_built = true;
         self.process_signal(); // Vec<f32>
         self.reconstruct_image();
-        return self.destination_image_buffer.clone();
+        return self.output_picture.clone();
     }
 
     /// Make 3 lanes with all pixels depending on the ordering modes
     fn order_signal(&mut self) {
         self.ordered_picture.clear();
-        match self.parameters.order_mode.get() {
+        match self.parameters.order_mode {
             OrderMode::Row => {
-                for pixel in self.source_image_buffer.enumerate_pixels_mut() {
-                    self.ordered_picture
-                        .push([pixel.2[0], pixel.2[1], pixel.2[2], pixel.2[3]]);
-                }
-            }
-            OrderMode::Column => {
-                for x in 0..self.source_image_buffer.width() {
-                    for y in 0..self.source_image_buffer.height() {
+                for y in 0..self.width {
+                    for x in 0..self.height {
                         let pixel = self.source_image_buffer.get_pixel(x, y);
                         self.ordered_picture
                             .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
                     }
                 }
             }
-            OrderMode::ReverseRow => {}
-            OrderMode::ReverseColumn => {}
+            OrderMode::Column => {
+                for x in 0..self.width {
+                    for y in 0..self.height {
+                        let pixel = self.source_image_buffer.get_pixel(x, y);
+                        self.ordered_picture
+                            .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
+                    }
+                }
+            }
+            OrderMode::ReverseRow => {
+                for y in self.width..0 {
+                    for x in self.height..0 {
+                        let pixel = self.source_image_buffer.get_pixel(x, y);
+                        self.ordered_picture
+                            .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
+                    }
+                }
+            }
+            OrderMode::ReverseColumn => {
+                for x in self.width..0 {
+                    for y in self.height..0 {
+                        let pixel = self.source_image_buffer.get_pixel(x, y);
+                        self.ordered_picture
+                            .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
+                    }
+                }
+            }
         }
     }
 
@@ -148,28 +283,27 @@ impl Processor {
 
     pub fn set_filters(&mut self) {
         self.filter.set_frequence_and_resonance(
-            self.parameters.filter_cutoff.get() as f32,
-            self.parameters.filter_resonance.value as f32 / 10.0,
+            self.parameters.filter_cutoff as f32,
+            self.parameters.filter_resonance as f32 / 10.0,
         )
     }
 
     pub fn set_delay(&mut self) {
+        self.delay.set_delay_time(self.parameters.delay_time as f32);
         self.delay
-            .set_delay_time(self.parameters.delay_time.get() as f32);
-        self.delay
-            .set_feedback(self.parameters.delay_feedback.get() as f32 / 1000.0);
+            .set_feedback(self.parameters.delay_feedback as f32 / 1000.0);
     }
 
     pub fn set_reverb(&mut self) {
         self.reverb
-            .set_reverb_time(self.parameters.reverb_decay.get() as f32 / 1000.0);
-        self.reverb.dry_wet = self.parameters.reverb_dry_wet.get() as f32 / 100.0;
+            .set_reverb_time(self.parameters.reverb_decay as f32 / 1000.0);
+        self.reverb.dry_wet = self.parameters.reverb_dry_wet as f32 / 100.0;
     }
 
     fn reset_processing(&mut self) {
         self.filter.flush();
         self.delay
-            .init_delay(1.0, self.parameters.delay_time.get() as f32); // dirty, add a flush function
+            .init_delay(1.0, self.parameters.delay_time as f32); // dirty, add a flush function
         self.reverb.init(100.0);
         self.set_delay();
         self.set_filters();
@@ -189,13 +323,13 @@ impl Processor {
         let mut count = 0;
         let mut modulo = 0;
 
-        match self.parameters.order_mode.get() {
+        match self.parameters.order_mode {
             OrderMode::Column => modulo = self.height,
             OrderMode::Row => modulo = self.width,
             _ => {}
         }
 
-        match self.parameters.color_mode.get() {
+        match self.parameters.color_mode {
             ColorMode::Bayer => {
                 let mut bayer_row = false;
                 let mut bayer_column = false;
@@ -205,7 +339,7 @@ impl Processor {
                     // match color {
                     let mut flag = Flag::Continue;
                     if count == modulo {
-                        if self.parameters.continuous.value == false {
+                        if self.parameters.continuous == false {
                             flag = Flag::Reset;
                         }
                         count = 0;
@@ -214,8 +348,7 @@ impl Processor {
 
                     let x = bayer_row as usize;
                     let y = bayer_column as usize;
-                    let color_index =
-                        self.bayer_matrix[y][x] as usize;
+                    let color_index = self.bayer_matrix[y][x] as usize;
                     let pixel_value = pixel[color_index];
 
                     self.signal.push((pixel_value as f32, flag));
@@ -228,7 +361,7 @@ impl Processor {
             ColorMode::Interleaved => {
                 for pixel in self.ordered_picture.clone() {
                     let mut flag = Flag::Continue;
-                    if self.parameters.continuous.value == false && count % modulo == 0 {
+                    if self.parameters.continuous == false && count % modulo == 0 {
                         flag = Flag::Reset
                     }
                     for i in 0..self.number_of_channels {
@@ -243,7 +376,7 @@ impl Processor {
                 for i in 0..self.number_of_channels {
                     for pixel in self.ordered_picture.clone() {
                         let mut flag = Flag::Continue;
-                        if self.parameters.continuous.value == false && count % modulo == 0 {
+                        if self.parameters.continuous == false && count % modulo == 0 {
                             flag = Flag::Reset
                         }
                         self.signal.push((pixel[i] as f32, flag));
@@ -269,50 +402,42 @@ impl Processor {
     pub fn reconstruct_image(&mut self) {
         let mut count = 0;
         let len = self.processed_picture.len();
-        let destination_len = self.destination_image_buffer.len();
+        let destination_len = self.output_picture.data.len();
         let offset = len / self.number_of_channels;
 
-        match self.parameters.order_mode.get() {
+        match self.parameters.order_mode {
             OrderMode::Row => {
-                let mut dest: &ImageBuffer<Rgba<u8>, Vec<u8>> = &self.destination_image_buffer;
-
                 for y in 0..self.height as usize {
                     for x in 0..self.width as usize {
-                        match self.parameters.color_mode.get() {
+                        match self.parameters.color_mode {
                             ColorMode::Interleaved => {
                                 let r = self.processed_picture[count] as u8;
                                 let g = self.processed_picture[count + 1] as u8;
                                 let b = self.processed_picture[count + 2] as u8;
-                                let a = match self.parameters.alpha_mode.get() {
+                                let a = match self.parameters.alpha_mode {
                                     AlphaMode::Delete => 255 as u8,
                                     AlphaMode::Interleave => {
                                         self.processed_picture[count + 3] as u8
                                     }
                                     AlphaMode::Preserve => {
-                                        self.source_image_buffer.get_pixel(x as u32, y as u32)[3]
-                                            as u8
+                                        self.source_image_buffer.get_pixel(x, y)[3] as u8
                                     }
                                 };
 
-                                *self
-                                    .destination_image_buffer
-                                    .get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
+                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
                                 count = count + self.number_of_channels;
                             }
                             ColorMode::Bayer => {
                                 let color = self.bayer_matrix[y % 2][x % 2] as usize;
                                 let (r, g, b) = self.bayer_dematricing(x, y, color);
-                                let a = match self.parameters.alpha_mode.get() {
+                                let a = match self.parameters.alpha_mode {
                                     AlphaMode::Delete => 255 as u8,
                                     AlphaMode::Interleave => 255, // To do, 4 color marticing ?
                                     AlphaMode::Preserve => {
-                                        self.source_image_buffer.get_pixel(x as u32, y as u32)[3]
-                                            as u8
+                                        self.source_image_buffer.get_pixel(x, y)[3] as u8
                                     }
                                 };
-                                *self
-                                    .destination_image_buffer
-                                    .get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
+                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
                                 count = count + 1;
                             }
                             ColorMode::Composite => {
@@ -321,19 +446,16 @@ impl Processor {
                                 let b = self.processed_picture[count + (offset * 2)] as u8;
                                 let mut a = 255;
 
-                                match self.parameters.alpha_mode.get() {
+                                match self.parameters.alpha_mode {
                                     AlphaMode::Delete => {}
                                     AlphaMode::Interleave => {
                                         a = self.processed_picture[count + (offset * 3)] as u8;
                                     }
                                     AlphaMode::Preserve => {
-                                        a = self.source_image_buffer[(x as u32, y as u32)].0[3];
+                                        a = self.source_image_buffer.get_pixel_color(x, y, 3);
                                     }
                                 }
-
-                                *self
-                                    .destination_image_buffer
-                                    .get_pixel_mut(x as u32, y as u32) = image::Rgba([r, g, b, a]);
+                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
                                 count = count + 1;
                             }
                         }
@@ -396,7 +518,6 @@ impl Processor {
         let (mut r, mut g, mut b) = (0, 0, 0);
 
         match pixel_color {
-
             // red and blue indexes are flipped
             // don't ask
             // I'm tired
@@ -442,6 +563,6 @@ impl Processor {
     pub fn make_file(&self) {
         // Write the contents of this image to the Writer in PNG format.
 
-        self.destination_image_buffer.save("test.png").unwrap();
+        // self.output_picture.save("test.png").unwrap();
     }
 }

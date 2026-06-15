@@ -10,7 +10,43 @@ anyhow = "1.0.100"
 arg = "0.4.1"
 image = "0.25.6"
 time = "0.3.41"
-wasm-bindgen = "0.2.125"
+wasm-bindgen = { version = "0.2.92", optional = true }
+js-sys = { version = "0.3.62", optional = true }
+node-sys = { version = "0.4.2", optional = true }
+
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "Document",
+  "Element",
+  "HtmlElement",
+  "Node",
+  "Window",
+  "CanvasRenderingContext2d",
+  "ImageData",
+  "HtmlCanvasElement",
+  "HtmlImageElement",
+  "console",
+  'CssStyleDeclaration',
+  'EventTarget',
+  "Blob",
+]
+optional = true
+
+[features]
+default = ["enable_wasm"]
+enable_wasm = [
+  "wasm-bindgen",
+  "web-sys",
+  "js-sys",
+  "node-sys",
+]
