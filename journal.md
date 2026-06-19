@@ -124,3 +124,38 @@ thus the first index selects the y, and the second the x
 I refactored everything to work within a js file
 next step is building said js file with a canvas, a bunch of slider and a process button
 I should be able to get most of the functional and UI things from the wepgpu repo made with guk
+
+18 Jun Intefaced the js with the rust, you can load the image to the canvas and trigger the processing, but currently I'm struggling to output the image to the canvas
+my output image seems to have the correct width, size and lenght, but I'm copying the value from the input source, I've got no proof that the data is right
+try managing everything in the rust to be sure that there is no problem with the js glue between the processing and the canvas modification
+
+try to make a dummy image a fill with white, put the put image definitely doesn't work, I need more info about the image format to be sure that I'm giving it something that makes sense.
+
+>ImageData.data Read only
+>    A Uint8ClampedArray or Float16Array representing a one-dimensional array containing the data in the RGBA order. The order goes by rows from the top-left pixel to the bottom-right.
+
+seems correct [from here](https://developer.mozilla.org/en-US/docs/Web/API/ImageData)
+
+try to do the put image data in js ? actually it's exactly the same thing that happen in rust
+
+ok, white image to canvas in rust works , I fill the picture with white pixel at a lower level in the processor to check the link between main and the processor, if the problem doesn't come from the js-wasm glue. the problem for the white picture came from using the wrong size, it failed silently it seems, I added and `asserteq()` to check the size but it seems to work ok with the processor, next step, check the pixel content of the output picture vector
+
+Ok, indeed weird stuff is happening, only the first quarter get filled with white, which would indicate some kind of iteration problem somewhere
+
+let's try to convert the incoming data in a picture, then converting it back, to be sure that the class constructor works properly
+
+Doing the smallest possible code that reproduce the bug, it's still present, it's probably coming from the set_pixel function
+
+it's always exactly one quarter which is very weird
+probably linked with the 4 colors ?
+one pixel setting and getting seems to work properly though
+
+BUT isn't it that the index if broken in the two sides and thus showing two time the wrong pixel ?
+
+lmao I just needed to change the get index function, it didn't took into account the fact that everything is multiplied by four
+
+filter is broken but the rest actually works !!
+
+let's add sliders
+
+sliders works, currently, once you processed you cannot change the picture anymore, the processing is incremental, which is not the point (although it's an interesting feature)

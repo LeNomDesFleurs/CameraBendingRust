@@ -123,7 +123,8 @@ impl Picture {
     }
     pub fn set_pixel(&mut self, x: usize, y: usize, value: [u8; 4]) {
         let index = self.get_index(x, y);
-        for i in 0..3 {
+
+        for i in 0..4 {
             self.data[index + i] = value[i];
         }
     }
@@ -132,11 +133,14 @@ impl Picture {
         self.data[index]
     }
     fn get_index(&self, x: usize, y: usize) -> usize {
-        // wrap if to high, no security over under index, I don't want it to fail silently
-        ((x as usize) + y * self.width as usize) as usize % self.data.len()
+        // wrap if too high, no security over under index, I don't want it to fail silently
+        ((x as usize * 4) + (y * self.width * 4) as usize) as usize % self.data.len()
     }
     pub fn get_raw_data(&self) -> Vec<u8> {
         self.data.clone()
+    }
+    pub fn get_lenght(&self) -> usize {
+        return self.data.len();
     }
 }
 
@@ -284,20 +288,20 @@ impl Processor {
     pub fn set_filters(&mut self) {
         self.filter.set_frequence_and_resonance(
             self.parameters.filter_cutoff as f32,
-            self.parameters.filter_resonance as f32 / 10.0,
+            self.parameters.filter_resonance as f32,
         )
     }
 
     pub fn set_delay(&mut self) {
         self.delay.set_delay_time(self.parameters.delay_time as f32);
         self.delay
-            .set_feedback(self.parameters.delay_feedback as f32 / 1000.0);
+            .set_feedback(self.parameters.delay_feedback as f32);
     }
 
     pub fn set_reverb(&mut self) {
         self.reverb
-            .set_reverb_time(self.parameters.reverb_decay as f32 / 1000.0);
-        self.reverb.dry_wet = self.parameters.reverb_dry_wet as f32 / 100.0;
+            .set_reverb_time(self.parameters.reverb_decay as f32);
+        self.reverb.dry_wet = self.parameters.reverb_dry_wet as f32;
     }
 
     fn reset_processing(&mut self) {
