@@ -4,6 +4,7 @@ use crate::buffer;
 pub use crate::buffer::DelayLine;
 pub use crate::filter::Biquad;
 pub use crate::filter::FilterType;
+use crate::outils;
 pub use crate::reverb::Reverb;
 #[derive(PartialEq)]
 enum AlphaMode {
@@ -37,6 +38,8 @@ pub struct Parameters {
     pub filter_resonance: f32,
     pub reverb_dry_wet: f32,
     pub reverb_decay: f32,
+    wavefolder_amount: f32,
+    wavefolder_frequency: f32,
     pub continuous: bool,
 }
 
@@ -51,6 +54,8 @@ impl Parameters {
         filter_resonance: f32,
         reverb_dry_wet: f32,
         reverb_decay: f32,
+        wavefolder_amount: f32,
+        wavefolder_frequency: f32,
         continuous: bool,
     ) -> Self {
         let alpha_mode_enum: AlphaMode = match alpha_mode {
@@ -82,6 +87,8 @@ impl Parameters {
             filter_resonance,
             reverb_dry_wet,
             reverb_decay,
+            wavefolder_amount,
+            wavefolder_frequency,
             continuous,
         }
     }
@@ -215,13 +222,15 @@ impl Processor {
         new
     }
 
-    fn dumb_wavefolder(input_sample: f32)->f32{
-
-        let half = 255.0/2.0;
-        let period = 10.0;
-        let output_sample = ((input_sample/period).sin()*half)+half;
-        return output_sample;
-
+    fn dumb_wavefolder(&self, input_sample: f32) -> f32 {
+        let half = 255.0 / 2.0;
+        let period = self.parameters.wavefolder_frequency;
+        let output_sample = ((input_sample / period).sin() * half) + half;
+        return outils::linear_crossfade(
+            input_sample,
+            output_sample,
+            self.parameters.wavefolder_amount,
+        );
     }
 
     /// Main function orchestrating everything else
@@ -328,10 +337,14 @@ impl Processor {
         // temp = self.filter.process(temp);
         temp = self.delay.process(temp);
         temp = self.reverb.process(temp);
-        temp = Self::dumb_wavefolder(temp);
-        if temp > 255.0 { temp = 255.0}
-        if temp<0.0 {temp = 0.0}
-        
+        temp = self.dumb_wavefolder(temp);
+        if temp > 255.0 {
+            temp = 255.0
+        }
+        if temp < 0.0 {
+            temp = 0.0
+        }
+
         return temp;
     }
 

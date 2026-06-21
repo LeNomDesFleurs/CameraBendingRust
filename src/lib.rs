@@ -41,13 +41,15 @@ pub fn process_picture(
     filter_resonance: f32,
     reverb_dry_wet: f32,
     reverb_decay: f32,
+    wavefolder_amount:f32,
+    wavefolder_frequency:f32,
     continuous: bool,
 ){
     let w = canvas.width();
     let h = canvas.height();
     let imgdata = ctx.get_image_data(0.0, 0.0, w as f64, h as f64).unwrap();
     let raw_pixels = imgdata.data().to_vec();
-    let mut picture = Picture::new(raw_pixels, w as usize, h as usize);
+    let picture = Picture::new(raw_pixels, w as usize, h as usize);
     console::log_1(&format!("width: {}, height: {}", canvas.width(), canvas.height()).into());
     
     let parameters = Parameters::new(
@@ -60,6 +62,8 @@ pub fn process_picture(
         filter_resonance,
         reverb_dry_wet,
         reverb_decay,
+        wavefolder_amount,
+        wavefolder_frequency,
         continuous,
     );
 

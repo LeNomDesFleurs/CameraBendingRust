@@ -159,3 +159,19 @@ filter is broken but the rest actually works !!
 let's add sliders
 
 sliders works, currently, once you processed you cannot change the picture anymore, the processing is incremental, which is not the point (although it's an interesting feature)
+
+Made a hardwired wavefolder
+$y = sin(x/10)*127+127$
+made to use full range
+I'll need to add a kind of param on the frequency on the wavefolder (the ten) and the amount of it
+I could do an interpolation between this output and the actual sample (a dry,wet, actually)
+
+right now to add a param you need to : 
+1. add it in the parameters description
+2. add it in the parameters constructor (argument + function)
+4. add it to the main function parameter construction
+5. add it to the html file
+6. retrieve value in js
+
+do I even need to have the parameter struct still ?
+it mainly useful for UI stuff but it's not really relevant anymore
