@@ -34,9 +34,9 @@ var processButton = document.getElementById('process');
 processButton.addEventListener('click', async () => {
     
     let raw_data = process_picture(canvas, ctx, 
-        0,//alpha mode
+         document.querySelector('input[name="alpha_mode"]:checked').value, //alpha mode
          document.querySelector('input[name="color_mode"]:checked').value, //color mode
-          0, //order mode
+         document.querySelector('input[name="order_mode"]:checked').value, //order mode
            document.getElementById('delay').value, //delay time
            document.getElementById('feedback').value, //delay feedback
            20, // filter cutoff

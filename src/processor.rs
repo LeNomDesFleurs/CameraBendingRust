@@ -215,6 +215,15 @@ impl Processor {
         new
     }
 
+    fn dumb_wavefolder(input_sample: f32)->f32{
+
+        let half = 255.0/2.0;
+        let period = 10.0;
+        let output_sample = ((input_sample/period).sin()*half)+half;
+        return output_sample;
+
+    }
+
     /// Main function orchestrating everything else
     pub fn process_image(&mut self) -> Picture {
         self.set_delay();
@@ -319,6 +328,10 @@ impl Processor {
         // temp = self.filter.process(temp);
         temp = self.delay.process(temp);
         temp = self.reverb.process(temp);
+        temp = Self::dumb_wavefolder(temp);
+        if temp > 255.0 { temp = 255.0}
+        if temp<0.0 {temp = 0.0}
+        
         return temp;
     }
 
