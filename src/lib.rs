@@ -43,6 +43,7 @@ pub fn process_picture(
     reverb_decay: f32,
     wavefolder_amount:f32,
     wavefolder_frequency:f32,
+    bitwise:f32,
     continuous: bool,
 ){
     let w = canvas.width();
@@ -64,6 +65,7 @@ pub fn process_picture(
         reverb_decay,
         wavefolder_amount,
         wavefolder_frequency,
+        bitwise,
         continuous,
     );
 

@@ -40,6 +40,7 @@ pub struct Parameters {
     pub reverb_decay: f32,
     wavefolder_amount: f32,
     wavefolder_frequency: f32,
+    bitwise: f32,
     pub continuous: bool,
 }
 
@@ -56,6 +57,7 @@ impl Parameters {
         reverb_decay: f32,
         wavefolder_amount: f32,
         wavefolder_frequency: f32,
+        bitwise:f32,
         continuous: bool,
     ) -> Self {
         let alpha_mode_enum: AlphaMode = match alpha_mode {
@@ -89,6 +91,7 @@ impl Parameters {
             reverb_decay,
             wavefolder_amount,
             wavefolder_frequency,
+            bitwise,
             continuous,
         }
     }
@@ -338,6 +341,7 @@ impl Processor {
         temp = self.delay.process(temp);
         temp = self.reverb.process(temp);
         temp = self.dumb_wavefolder(temp);
+        temp = (temp as u8 & self.parameters.bitwise as u8) as f32;
         if temp > 255.0 {
             temp = 255.0
         }

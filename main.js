@@ -43,8 +43,9 @@ processButton.addEventListener('click', async () => {
            0.0, //filter resonance
            0.0, //reverb time
            0.0, //reverb dry wet
-           document.getElementById('wavefolder_amount').value, //delay time
-           document.getElementById('wavefolder_freq').value, //delay time
+           document.getElementById('wavefolder_amount').value, 
+           document.getElementById('wavefolder_freq').value, 
+           document.getElementById('bitwise').value, 
 
             document.getElementById('continous').checked //continous
            );
