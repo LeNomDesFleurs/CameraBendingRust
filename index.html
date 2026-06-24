@@ -53,6 +53,7 @@
     <div id="controller">
         <input type="file" id="imageLoader" name="imageLoader"/>
         <button id="process">Process</button>
+        <button id="reset">Reset</button>
         <button id="download">Download</button>
         Color mode
         <label><input type="radio" name="color_mode" value="0" checked/> Composite</label>
@@ -71,7 +72,7 @@
         Continous
         <label><input type="checkbox" id="continous" required /> <i>I agree</i></label>
         Delay Time
-        <input type="range" id="delay" min="0" max="1000" step="1" value="0">
+        <input type="range" id="delay" min="0" max="100" step="1" value="0">
         Feedback
         <input type="range" id="feedback" min="0" max="100" step="0.01" value="0">
         Reverb Time
@@ -79,7 +80,7 @@
         wavefolder amount
         <input type="range" id="wavefolder_amount" min="0" max="1" step="0.01" value="0">
         wavefolder freq
-        <input type="range" id="wavefolder_freq" min="5" max="255" step="1" value="10">
+        <input type="range" id="wavefolder_freq" min="1" max="50" step="1" value="10">
         bitwiser
         <input type="range" id="bitwise" min="0" max="255" step="1" value="255">
     </div>

@@ -21,11 +21,13 @@ let renderContext
 
 var download = function () {}
 
+let source_image = new Image()
+
 async function main() {
     await init() // must come first
 
     var imageLoader = document.getElementById('imageLoader')
-    imageLoader.addEventListener('change', handleImage, false)
+    imageLoader.addEventListener('input', handleImage, false)
     var canvas = document.getElementById('imageCanvas')
     var ctx = canvas.getContext('2d')
 
@@ -59,16 +61,21 @@ async function main() {
         link.click()
     })
 
+    var ResetButton = document.getElementById('reset')
+
+    ResetButton.addEventListener('click', async () => {
+        ctx.drawImage(source_image, 0, 0)
+    })
+
     function handleImage(e) {
         var reader = new FileReader()
         reader.onload = function (event) {
-            var img = new Image()
-            img.onload = function () {
-                canvas.width = img.width
-                canvas.height = img.height
-                ctx.drawImage(img, 0, 0)
+            source_image.onload = function () {
+                canvas.width = source_image.width
+                canvas.height = source_image.height
+                ctx.drawImage(source_image, 0, 0)
             }
-            img.src = event.target.result
+            source_image.src = event.target.result
         }
         reader.readAsDataURL(e.target.files[0])
     }
