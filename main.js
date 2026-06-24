@@ -1,4 +1,3 @@
-
 // import { state, getRenderDonePromise, SetBitMap, IMAGE_URL } from './src/utils.js'
 // import rust_wasm_init from "./pkg/bending.js";
 
@@ -15,79 +14,67 @@
 
 // run_wasm_function()
 
-import init, { process_picture, putImageData } from './pkg/bending.js';
+import init, { process_picture, putImageData } from './pkg/bending.js'
 
+let CURRENT_MODEL
+let renderContext
 
+var download = function () {}
 
-let CURRENT_MODEL;
-let renderContext;
+async function main() {
+    await init() // must come first
 
-  var download = function(){
-    var link = document.createElement('a');
-    link.download = 'filename.png';
-    link.href = document.getElementById('imageCanvas').toDataURL()
-    link.click();
-    }
+    var imageLoader = document.getElementById('imageLoader')
+    imageLoader.addEventListener('change', handleImage, false)
+    var canvas = document.getElementById('imageCanvas')
+    var ctx = canvas.getContext('2d')
 
-async function main(){
-    await init(); // must come first
-    
-var imageLoader = document.getElementById('imageLoader');
-imageLoader.addEventListener('change', handleImage, false);
-var canvas = document.getElementById('imageCanvas');
-var ctx = canvas.getContext('2d');
-
-var processButton = document.getElementById('process');
-processButton.addEventListener('click', async () => {
-    
-    let raw_data = process_picture(canvas, ctx, 
-         document.querySelector('input[name="alpha_mode"]:checked').value, //alpha mode
-         document.querySelector('input[name="color_mode"]:checked').value, //color mode
-         document.querySelector('input[name="order_mode"]:checked').value, //order mode
-           document.getElementById('delay').value, //delay time
-           document.getElementById('feedback').value, //delay feedback
-           20, // filter cutoff
-           0.0, //filter resonance
-           0.0, //reverb time
-           0.0, //reverb dry wet
-           document.getElementById('wavefolder_amount').value, 
-           document.getElementById('wavefolder_freq').value, 
-           document.getElementById('bitwise').value, 
+    var processButton = document.getElementById('process')
+    processButton.addEventListener('click', async () => {
+        let raw_data = process_picture(
+            canvas,
+            ctx,
+            document.querySelector('input[name="alpha_mode"]:checked').value, //alpha mode
+            document.querySelector('input[name="color_mode"]:checked').value, //color mode
+            document.querySelector('input[name="order_mode"]:checked').value, //order mode
+            document.getElementById('delay').value, //delay time
+            document.getElementById('feedback').value, //delay feedback
+            20, // filter cutoff
+            0.0, //filter resonance
+            0.0, //reverb time
+            0.0, //reverb dry wet
+            document.getElementById('wavefolder_amount').value,
+            document.getElementById('wavefolder_freq').value,
+            document.getElementById('bitwise').value,
 
             document.getElementById('continous').checked //continous
-           );
-});
+        )
+    })
 
-    
-    var downloadButton = document.getElementById('download');
-downloadButton.addEventListener('click', async () => {
-    
-  
+    var downloadButton = document.getElementById('download')
+    downloadButton.addEventListener('click', async () => {
+        var link = document.createElement('a')
+        link.download = 'processed.png'
+        link.href = canvas.toDataURL()
+        link.click()
+    })
 
-    download()
-   
-});
-    
-
-
-function handleImage(e){
-    var reader = new FileReader();
-    reader.onload = function(event){
-        var img = new Image();
-        img.onload = function(){
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img,0,0);
+    function handleImage(e) {
+        var reader = new FileReader()
+        reader.onload = function (event) {
+            var img = new Image()
+            img.onload = function () {
+                canvas.width = img.width
+                canvas.height = img.height
+                ctx.drawImage(img, 0, 0)
+            }
+            img.src = event.target.result
         }
-        img.src = event.target.result;
+        reader.readAsDataURL(e.target.files[0])
     }
-    reader.readAsDataURL(e.target.files[0]);     
-}
 }
 
-
-
-main();
+main()
 
 // document.addEventListener('DOMContentLoaded', async () => {
 
@@ -115,7 +102,7 @@ main();
 //             CURRENT_MODEL.render();
 //         })
 //         modelsContainer.appendChild(button);
-        
+
 //         async function handeDownload(pixelBuffer, widthBytes, heightBytes) {
 //             let canvas = document.getElementById('gfx')
 //             let canvasUrl = canvas.toDataURL('image/jpeg', 1)
@@ -125,7 +112,7 @@ main();
 //             createEl.click()
 //             createEl.remove()
 //         }
-        
+
 //         // <label>PNG file: <input type="file" id="image_input" accept="image/png" id="load-image"></label>
 //         const container = document.getElementById('controller')
 //         const fileLabel = document.createElement('label')
@@ -141,7 +128,7 @@ main();
 //     })
 //     fileLabel.appendChild(input)
 //     container.appendChild(fileLabel)
-    
+
 //     const DownloadButton = document.createElement('button')
 //         ; (DownloadButton.textContent = 'Download'),
 //             (DownloadButton.style.width = '100px')
@@ -151,8 +138,6 @@ main();
 //     })
 //     modelsContainer.appendChild(DownloadButton)
 //     // <button id="download">Download Canvas</button>
-
-
 
 //     function convertBGRAtoRGBA(input, width, height) {
 //         const output = new Uint8ClampedArray(width * height * 4)
@@ -165,8 +150,5 @@ main();
 //         }
 //         return output
 //     }
-    
 
 // });
-
-

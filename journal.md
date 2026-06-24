@@ -176,3 +176,15 @@ right now to add a param you need to :
 
 do I even need to have the parameter struct still ?
 it mainly useful for UI stuff but it's not really relevant anymore
+
+
+## handling latency
+
+    the thing is to still fill the image completely
+    the while / for loop / counter should refer to the destination picture, i'll need to pad the end of the row of pixel to get all values out
+
+    dirsty : at reset, first push latency_amount of pixel to dest, then pre process the amount
+
+    will create but if latency > image size
+
+    slowly getting there, currently I have an offset of delay_time size at the first line, then a 1 pixel offset building up (increment error) 
