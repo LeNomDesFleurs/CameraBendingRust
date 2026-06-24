@@ -8,6 +8,7 @@
     - [ ] use the parameters as argument for input
 - [ ] collumn
 - [ ] latency compensation
+- [ ] non square image broken
 - [x] optimize signal constuction, don't redo it if the parameters haven't changed
 
 ## BUG

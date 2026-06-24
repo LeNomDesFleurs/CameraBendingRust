@@ -22,6 +22,13 @@ import init, { process_picture, putImageData } from './pkg/bending.js';
 let CURRENT_MODEL;
 let renderContext;
 
+  var download = function(){
+    var link = document.createElement('a');
+    link.download = 'filename.png';
+    link.href = document.getElementById('imageCanvas').toDataURL()
+    link.click();
+    }
+
 async function main(){
     await init(); // must come first
     
@@ -51,6 +58,17 @@ processButton.addEventListener('click', async () => {
            );
 });
 
+    
+    var downloadButton = document.getElementById('download');
+downloadButton.addEventListener('click', async () => {
+    
+  
+
+    download()
+   
+});
+    
+
 
 function handleImage(e){
     var reader = new FileReader();
@@ -66,6 +84,8 @@ function handleImage(e){
     reader.readAsDataURL(e.target.files[0]);     
 }
 }
+
+
 
 main();
 
