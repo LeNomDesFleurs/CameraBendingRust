@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en-US">
+
 <head>
     <meta charset="UTF-8" />
     <title>WebGPU particle experimentation</title>
     <style>
-        html, body{
+        html,
+        body {
             margin: 0;
             padding: 0;
             border: 0;
@@ -46,37 +48,42 @@
         }
     </style>
 </head>
+
 <body>
     <div id="models-container"></div>
-    <canvas id="imageCanvas" width="1000", height="1000" oncontextmenu="return false"></canvas>
+    <canvas id="imageCanvas" width="1000" , height="1000" oncontextmenu="return false"></canvas>
     <!-- <button>Settings</button> -->
     <div id="controller">
-        <input type="file" id="imageLoader" name="imageLoader"/>
+        <input type="file" id="imageLoader" name="imageLoader" />
         <button id="process">Process</button>
         <button id="reset">Reset</button>
         <button id="download">Download</button>
         Color mode
-        <label><input type="radio" name="color_mode" value="0" checked/> Composite</label>
+        <label><input type="radio" name="color_mode" value="0" checked /> Composite</label>
         <label><input type="radio" name="color_mode" value="1" /> Interleaved</label>
         <label><input type="radio" name="color_mode" value="2" /> Bayer</label>
         Alpha mode
-        <label><input type="radio" name="alpha_mode" value="0" checked/> Preserve</label>
+        <label><input type="radio" name="alpha_mode" value="0" checked /> Preserve</label>
         <label><input type="radio" name="alpha_mode" value="1" /> Delete</label>
         <label><input type="radio" name="alpha_mode" value="2" /> Interleave</label>
         Order mode
-        <label><input type="radio" name="order_mode" value="0" checked/> Row</label>
+        <label><input type="radio" name="order_mode" value="0" checked /> Row</label>
         <label><input type="radio" name="order_mode" value="1" /> Column</label>
         <label><input type="radio" name="order_mode" value="2" /> Reversed Row</label>
         <label><input type="radio" name="order_mode" value="3" /> Reversed Col</label>
-        
+
         Continous
         <label><input type="checkbox" id="continous" required /> <i>I agree</i></label>
+        Filter Cutoff
+        <input type="range" id="filter_cutoff" min="0" max="15000" step="1" value="15000">
+        Filter Resonance
+        <input type="range" id="filter_resonance" min="0.01" max="100" step="0.01" value="0.7">
         Delay Time
-        <input type="range" id="delay" min="0" max="100" step="1" value="0">
+        <input type="range" id="delay" min="0" max="30" step="1" value="0">
         Feedback
         <input type="range" id="feedback" min="0" max="100" step="0.01" value="0">
         Reverb Time
-        <input type="range" id="delay" min="0" max="100" step="1" value="0">
+        <input type="range" id="reverb_time" min="0" max="100" step="1" value="0">
         wavefolder amount
         <input type="range" id="wavefolder_amount" min="0" max="1" step="0.01" value="0">
         wavefolder freq
@@ -87,4 +94,5 @@
     <script type="module" src="main.js"></script>
     <!-- <script type="module" src="controller.js"></script> -->
 </body>
+
 </html>

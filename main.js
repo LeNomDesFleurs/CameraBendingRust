@@ -41,9 +41,9 @@ async function main() {
             document.querySelector('input[name="order_mode"]:checked').value, //order mode
             document.getElementById('delay').value, //delay time
             document.getElementById('feedback').value, //delay feedback
-            20, // filter cutoff
-            0.0, //filter resonance
-            0.0, //reverb time
+            document.getElementById('filter_cutoff').value, // filter cutoff
+            document.getElementById('filter_resonance').value, // filter resonance
+            document.getElementById('reverb_time').value, //reverb time
             0.0, //reverb dry wet
             document.getElementById('wavefolder_amount').value,
             document.getElementById('wavefolder_freq').value,

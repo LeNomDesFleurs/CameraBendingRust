@@ -188,3 +188,16 @@ it mainly useful for UI stuff but it's not really relevant anymore
     will create but if latency > image size
 
     slowly getting there, currently I have an offset of delay_time size at the first line, then a 1 pixel offset building up (increment error) 
+
+## height != width problem
+
+height == width works well
+but height != width creates bug
+for 999x1000
+    create a diagonal 1 pix shift
+if height = 2 * width (vertical half)
+    stretch image double
+if width = 2 * height (horizontal half)
+    squish half vertically
+    tile the left part four time
+

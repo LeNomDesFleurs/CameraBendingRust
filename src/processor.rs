@@ -144,7 +144,11 @@ impl Picture {
     }
     fn get_index(&self, x: usize, y: usize) -> usize {
         // wrap if too high, no security over under index, I don't want it to fail silently
-        ((x as usize * 4) + (y * self.width * 4) as usize) as usize % self.data.len()
+        let mut index = ((x as usize) + (y * self.width) as usize)*4 as usize ;
+        if index >= self.data.len(){
+            index = 0;
+        };
+        return index;
     }
     pub fn get_raw_data(&self) -> Vec<u8> {
         self.data.clone()
@@ -262,8 +266,8 @@ impl Processor {
         self.ordered_picture.clear();
         match self.parameters.order_mode {
             OrderMode::Row => {
-                for y in 0..self.width {
-                    for x in 0..self.height {
+                for y in 0..self.height {
+                    for x in 0..self.width {
                         let pixel = self.source_image_buffer.get_pixel(x, y);
                         self.ordered_picture
                             .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
@@ -337,7 +341,7 @@ impl Processor {
 
     fn process_sample(&mut self, sample: f32) -> f32 {
         let mut temp = sample;
-        // temp = self.filter.process(temp);
+        temp = self.filter.process(temp);
         temp = self.delay.process(temp);
         temp = self.reverb.process(temp);
         temp = self.dumb_wavefolder(temp);
@@ -364,6 +368,32 @@ impl Processor {
         }
 
         match self.parameters.color_mode {
+            ColorMode::Composite => {
+                for i in 0..self.number_of_channels {
+                    for pixel in self.ordered_picture.clone() {
+                        let mut flag = Flag::Continue;
+                        if self.parameters.continuous == false && count % modulo == 0 {
+                            flag = Flag::Reset
+                        }
+                        self.signal.push((pixel[i] as f32, flag));
+                        count = count + 1;
+                    }
+                }
+            }
+            ColorMode::Interleaved => {
+                for pixel in self.ordered_picture.clone() {
+                    let mut flag = Flag::Continue;
+                    if self.parameters.continuous == false && count % modulo == 0 {
+                        flag = Flag::Reset
+                    }
+                    for i in 0..self.number_of_channels {
+                        self.signal.push((pixel[i] as f32, flag));
+                        flag = Flag::Continue //dirty
+                    }
+
+                    count = count + 1;
+                }
+            }
             ColorMode::Bayer => {
                 let mut bayer_row = false;
                 let mut bayer_column = false;
@@ -392,32 +422,6 @@ impl Processor {
                     bayer_column = !bayer_column;
                 }
             }
-            ColorMode::Interleaved => {
-                for pixel in self.ordered_picture.clone() {
-                    let mut flag = Flag::Continue;
-                    if self.parameters.continuous == false && count % modulo == 0 {
-                        flag = Flag::Reset
-                    }
-                    for i in 0..self.number_of_channels {
-                        self.signal.push((pixel[i] as f32, flag));
-                        flag = Flag::Continue //dirty
-                    }
-
-                    count = count + 1;
-                }
-            }
-            ColorMode::Composite => {
-                for i in 0..self.number_of_channels {
-                    for pixel in self.ordered_picture.clone() {
-                        let mut flag = Flag::Continue;
-                        if self.parameters.continuous == false && count % modulo == 0 {
-                            flag = Flag::Reset
-                        }
-                        self.signal.push((pixel[i] as f32, flag));
-                        count = count + 1;
-                    }
-                }
-            }
         }
     }
 
@@ -444,6 +448,24 @@ impl Processor {
                 for y in 0..self.height as usize {
                     for x in 0..self.width as usize {
                         match self.parameters.color_mode {
+                            ColorMode::Composite => {
+                                let r = self.processed_picture[count] as u8;
+                                let g = self.processed_picture[count + offset] as u8;
+                                let b = self.processed_picture[count + (offset * 2)] as u8;
+                                let mut a = 255;
+
+                                match self.parameters.alpha_mode {
+                                    AlphaMode::Delete => {}
+                                    AlphaMode::Interleave => {
+                                        a = self.processed_picture[count + (offset * 3)] as u8;
+                                    }
+                                    AlphaMode::Preserve => {
+                                        a = self.source_image_buffer.get_pixel_color(x, y, 3);
+                                    }
+                                }
+                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
+                                count = count + 1;
+                            }
                             ColorMode::Interleaved => {
                                 let r = self.processed_picture[count] as u8;
                                 let g = self.processed_picture[count + 1] as u8;
@@ -471,24 +493,6 @@ impl Processor {
                                         self.source_image_buffer.get_pixel(x, y)[3] as u8
                                     }
                                 };
-                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
-                                count = count + 1;
-                            }
-                            ColorMode::Composite => {
-                                let r = self.processed_picture[count] as u8;
-                                let g = self.processed_picture[count + offset] as u8;
-                                let b = self.processed_picture[count + (offset * 2)] as u8;
-                                let mut a = 255;
-
-                                match self.parameters.alpha_mode {
-                                    AlphaMode::Delete => {}
-                                    AlphaMode::Interleave => {
-                                        a = self.processed_picture[count + (offset * 3)] as u8;
-                                    }
-                                    AlphaMode::Preserve => {
-                                        a = self.source_image_buffer.get_pixel_color(x, y, 3);
-                                    }
-                                }
                                 self.output_picture.set_pixel(x, y, [r, g, b, a]);
                                 count = count + 1;
                             }

@@ -27,9 +27,7 @@ pub struct Biquad {
 }
 
 impl Biquad {
-    pub fn new(
-        filter_type: FilterType,
-    ) -> Self {
+    pub fn new(filter_type: FilterType) -> Self {
         Biquad {
             filter_type,
             frequency_cutoff: 440.,
@@ -48,12 +46,12 @@ impl Biquad {
         }
     }
 
-    pub fn init(&mut self, sample_rate: f32){
+    pub fn init(&mut self, sample_rate: f32) {
         self.sample_rate = sample_rate;
         self.compute_coef();
     }
 
-    pub fn flush(&mut self){
+    pub fn flush(&mut self) {
         self.b = [0.0, 0.0, 0.0];
         self.a = [0.0, 0.0, 0.0];
     }
@@ -191,7 +189,7 @@ impl Biquad {
         self.compute_coef();
     }
 
-    pub fn get_frequence_and_q(self)-> (f32, f32){
+    pub fn get_frequence_and_q(self) -> (f32, f32) {
         (self.frequency_cutoff, self.resonance)
     }
 
@@ -201,9 +199,8 @@ impl Biquad {
         let mut feedback = self.a[0];
         //1500 chosed by experimentation w/ sinensis, self osc around Q = 38
         feedback *= self.resonance / 1500.;
-        if feedback < -4.5 || feedback > 4.5 {
-            feedback /= 10.;
-        }
+        feedback = (feedback / 122.0).tanh() * 255.0;
+
         b0 += feedback;
         //shift new value in
         self.b[2] = self.b[1];

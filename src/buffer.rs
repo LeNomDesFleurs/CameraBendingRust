@@ -194,8 +194,7 @@ impl RingBuffer {
     /// buffer size and set the goal to reach.
     /// delay_time in milliseconds
     pub fn set_delay_time(&mut self, delay_time: f32) {
-        let delay_in_samples: i32 =
-            outils::convert_ms_to_sample(delay_time, self.sample_rate) as i32;
+        let delay_in_samples: i32 = delay_time as i32;
         //   adding some 4 samples padding just to be sure.
         self.size_goal = (delay_in_samples.clamp(4, self.buffer_size as i32 - 4)) as i32;
         if self.interpolation_mode == InterpolationMode::None {
@@ -330,7 +329,7 @@ impl DelayLine {
     ///time in seconds
     pub fn set_delay_time(&mut self, delay_time: f32) {
         self.delay_time = delay_time;
-        self.buffer.set_delay_time(delay_time * 1000.);
+        self.buffer.set_delay_time(delay_time);
     }
 
     pub fn set_feedback(&mut self, feedback: f32) {
