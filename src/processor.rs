@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::buffer;
 pub use crate::buffer::DelayLine;
+pub use crate::buffer::SimpleRingBuffer;
 pub use crate::filter::Biquad;
 pub use crate::filter::FilterType;
 use crate::outils;
@@ -45,6 +46,24 @@ pub struct Parameters {
 }
 
 impl Parameters {
+    pub fn new_default() -> Self {
+        Self {
+            alpha_mode: AlphaMode::Delete,
+            color_mode: ColorMode::Composite,
+            order_mode: OrderMode::Row,
+            delay_time: 0.0,
+            delay_feedback: 0.0,
+            filter_cutoff: 20000.0,
+            filter_resonance: 0.7,
+            reverb_dry_wet: 0.0,
+            reverb_decay: 1.0,
+            wavefolder_amount: 0.0,
+            wavefolder_frequency: 10.0,
+            bitwise: 255.0,
+            continuous: false,
+        }
+    }
+
     pub fn new(
         alpha_mode: u32,
         color_mode: u32,
@@ -57,7 +76,7 @@ impl Parameters {
         reverb_decay: f32,
         wavefolder_amount: f32,
         wavefolder_frequency: f32,
-        bitwise:f32,
+        bitwise: f32,
         continuous: bool,
     ) -> Self {
         let alpha_mode_enum: AlphaMode = match alpha_mode {
@@ -99,7 +118,7 @@ impl Parameters {
 
 // pub use crate::outils;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Flag {
     Reset,
     Continue,
@@ -144,8 +163,8 @@ impl Picture {
     }
     fn get_index(&self, x: usize, y: usize) -> usize {
         // wrap if too high, no security over under index, I don't want it to fail silently
-        let mut index = ((x as usize) + (y * self.width) as usize)*4 as usize ;
-        if index >= self.data.len(){
+        let mut index = ((x as usize) + (y * self.width) as usize) * 4 as usize;
+        if index >= self.data.len() {
             index = 0;
         };
         return index;
@@ -186,7 +205,7 @@ pub struct Processor {
 
     // signal: Signal<f32>,
     filter: Biquad,
-    delay: DelayLine,
+    delay: SimpleRingBuffer,
     reverb: Reverb,
 
     // ---------------file----------
@@ -204,20 +223,22 @@ impl Processor {
         let bufimg = input_image;
         let height = bufimg.height;
         let width = bufimg.width;
+        let delay = parameters.delay_time as usize;
+        let feedback = parameters.delay_feedback;
         let mut new = Self {
             parameters: parameters,
             quantization: 0.0,
             signal: Vec::new(),
             filter: Biquad::new(FilterType::LPF),
-            delay: DelayLine::new(1000.0, buffer::DelayMode::Comb),
+            delay: SimpleRingBuffer::new(100, delay, feedback),
             bayer_matrix: [[1, 0], [2, 1]],
             // [ G ; R ]
             // [ B ; G ]
             ordered_picture: Vec::new(),
             processed_picture: Vec::new(),
-            number_of_channels: 3,
             slices: Vec::new(),
             source_image_buffer: bufimg.clone(),
+            number_of_channels:3,
             output_picture: bufimg.clone(),
             width: width,
             height: height,
@@ -240,6 +261,13 @@ impl Processor {
         );
     }
 
+    pub fn set_number_of_channel(&mut self){
+        self.number_of_channels = match self.parameters.alpha_mode {
+            AlphaMode::Interleave => 4,
+            _ => 3,
+        };
+    }
+
     /// Main function orchestrating everything else
     pub fn process_image(&mut self) -> Picture {
         self.set_delay();
@@ -254,14 +282,13 @@ impl Processor {
         // make an signal out of the picture, from 2d to 1d
         self.order_signal(); // Vec<Vec<rgb>>
                              // organize colors in multiple signals, or interleave them all in one signal
-        self.split_colors(); // Vec<f32>
+        self.split_colors(); // Vec<f32, flag>
         self.signal_built = true;
         self.process_signal(); // Vec<f32>
         self.reconstruct_image();
         return self.output_picture.clone();
     }
 
-    /// Make 3 lanes with all pixels depending on the ordering modes
     fn order_signal(&mut self) {
         self.ordered_picture.clear();
         match self.parameters.order_mode {
@@ -304,58 +331,6 @@ impl Processor {
         }
     }
 
-    pub fn init(&mut self) {
-        self.filter.init(44000.0);
-        self.delay.init_delay(1.0, 0.0);
-        self.reverb.init(100.0);
-    }
-
-    pub fn set_filters(&mut self) {
-        self.filter.set_frequence_and_resonance(
-            self.parameters.filter_cutoff as f32,
-            self.parameters.filter_resonance as f32,
-        )
-    }
-
-    pub fn set_delay(&mut self) {
-        self.delay.set_delay_time(self.parameters.delay_time as f32);
-        self.delay
-            .set_feedback(self.parameters.delay_feedback as f32);
-    }
-
-    pub fn set_reverb(&mut self) {
-        self.reverb
-            .set_reverb_time(self.parameters.reverb_decay as f32);
-        self.reverb.dry_wet = self.parameters.reverb_dry_wet as f32;
-    }
-
-    fn reset_processing(&mut self) {
-        self.filter.flush();
-        self.delay
-            .init_delay(1.0, self.parameters.delay_time as f32); // dirty, add a flush function
-        self.reverb.init(100.0);
-        self.set_delay();
-        self.set_filters();
-        self.set_reverb();
-    }
-
-    fn process_sample(&mut self, sample: f32) -> f32 {
-        let mut temp = sample;
-        temp = self.filter.process(temp);
-        temp = self.delay.process(temp);
-        temp = self.reverb.process(temp);
-        temp = self.dumb_wavefolder(temp);
-        temp = (temp as u8 & self.parameters.bitwise as u8) as f32;
-        if temp > 255.0 {
-            temp = 255.0
-        }
-        if temp < 0.0 {
-            temp = 0.0
-        }
-
-        return temp;
-    }
-
     fn split_colors(&mut self) {
         self.signal.clear();
         let mut count = 0;
@@ -370,6 +345,7 @@ impl Processor {
         match self.parameters.color_mode {
             ColorMode::Composite => {
                 for i in 0..self.number_of_channels {
+                    count = 0;
                     for pixel in self.ordered_picture.clone() {
                         let mut flag = Flag::Continue;
                         if self.parameters.continuous == false && count % modulo == 0 {
@@ -381,19 +357,19 @@ impl Processor {
                 }
             }
             ColorMode::Interleaved => {
-                for pixel in self.ordered_picture.clone() {
+            for y in 0..self.height{
+                for x in 0..self.width{
                     let mut flag = Flag::Continue;
-                    if self.parameters.continuous == false && count % modulo == 0 {
+                    if self.parameters.continuous == false && x == 0 {
                         flag = Flag::Reset
                     }
                     for i in 0..self.number_of_channels {
-                        self.signal.push((pixel[i] as f32, flag));
-                        flag = Flag::Continue //dirty
+                        self.signal.push((self.ordered_picture[x + y * self.width][i] as f32, flag));
+                        flag = Flag::Continue //dirty, ensure that only the first color triggers the reset
                     }
-
-                    count = count + 1;
-                }
             }
+        }
+        }
             ColorMode::Bayer => {
                 let mut bayer_row = false;
                 let mut bayer_column = false;
@@ -425,9 +401,59 @@ impl Processor {
         }
     }
 
+    /// Make 3 lanes with all pixels depending on the ordering modes
+
+    pub fn init(&mut self) {
+        self.filter.init(44000.0);
+        // self.delay.init_delay(1.0, self.parameters.delay_time);
+        self.reverb.init(100.0);
+    }
+
+    pub fn set_filters(&mut self) {
+        self.filter.set_frequence_and_resonance(
+            self.parameters.filter_cutoff as f32,
+            self.parameters.filter_resonance as f32,
+        )
+    }
+
+    pub fn set_delay(&mut self) {
+        self.delay.set_delay(self.parameters.delay_time as usize);
+        self.delay.set_feedback(self.parameters.delay_feedback);
+    }
+
+    pub fn set_reverb(&mut self) {
+        self.reverb
+            .set_reverb_time(self.parameters.reverb_decay as f32);
+        self.reverb.dry_wet = self.parameters.reverb_dry_wet as f32;
+    }
+
+    fn reset_processing(&mut self) {
+        self.filter.flush();
+        self.delay.flush();
+        self.reverb.init(100.0);
+        self.set_filters();
+        self.set_reverb();
+    }
+
+    fn process_sample(&mut self, sample: f32) -> f32 {
+        let mut temp = sample;
+        temp = self.filter.process(temp);
+        temp = self.delay.process(temp);
+        temp = self.reverb.process(temp);
+        temp = self.dumb_wavefolder(temp);
+        temp = (temp as u8 & self.parameters.bitwise as u8) as f32;
+        if temp > 255.0 {
+            temp = 255.0
+        }
+        if temp < 0.0 {
+            temp = 0.0
+        }
+
+        return temp;
+    }
+
     fn process_signal(&mut self) {
         self.processed_picture.clear();
-
         for (pixel, flag) in self.signal.clone() {
             if flag == Flag::Reset {
                 self.reset_processing();
@@ -602,5 +628,61 @@ impl Processor {
         // Write the contents of this image to the Writer in PNG format.
 
         // self.output_picture.save("test.png").unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flags_row_composite() {
+        let width = 9;
+        let height = 9;
+        let size = width * height * 4;
+        let raw_data = vec![255 as u8; size];
+        let picture = Picture::new(raw_data, width, height);
+        // picture.get_pixel(0, 0);
+        let mut processor = Processor::new(picture, Parameters::new_default());
+        assert_eq!(processor.source_image_buffer.get_lenght(), size);
+        processor.order_signal();
+        processor.split_colors();
+        // R R R R R R R R R 
+        // R R R R R R R R R
+        // ...
+        // G G G G G G G G G
+        assert_eq!(processor.signal[0].1, Flag::Reset); // first R of first row
+        assert_eq!(processor.signal[width].1, Flag::Reset); // first R of second row
+        assert_eq!(processor.signal[(width) - 1].1, Flag::Continue);// last R of first row
+        assert_eq!(processor.signal[(width) + 1].1, Flag::Continue); // second R of second row
+        assert_eq!(processor.signal[width * height].1, Flag::Reset); //first G of first row
+        assert_eq!(processor.signal[width * height + width].1, Flag::Reset); //first G of second row
+    }
+
+    #[test]
+    fn flags_row_interleaved() {
+        let width = 9;
+        let height = 9;
+        let size = width * height * 4;
+        let raw_data = vec![255 as u8; size];
+        let picture = Picture::new(raw_data, width, height);
+        // picture.get_pixel(0, 0);
+        let mut parameters = Parameters::new_default();
+        parameters.color_mode = ColorMode::Interleaved;
+        parameters.alpha_mode = AlphaMode::Interleave;
+        let mut processor = Processor::new(picture, parameters);
+        assert_eq!(processor.source_image_buffer.get_lenght(), size);
+        processor.set_number_of_channel();
+        processor.order_signal();
+        processor.split_colors();
+
+        // 1234 5678 9,10,11,12 13,14,15,16 17,18,19,20 21,22,23,24  25,26,27,28 29,30,31,32  33,34,35,36
+        // RGBA RGBA    RGBA        RGBA       RGBA       RGBA       RGBA         RGBA         RGBA
+        // RGBA RGBA RGBA RGBA RGBA RGBA RGBA RGBA RGBA
+        assert_eq!(processor.signal[0].1, Flag::Reset);// first pixel of first row
+        assert_eq!(processor.signal[36].1, Flag::Reset); // first pixel of second row
+        assert_eq!(processor.signal[(width * 4) - 1].1, Flag::Continue); // Last A of first row
+        assert_eq!(processor.signal[(width * 4) + 1].1, Flag::Continue); // first G of second row
+        assert_eq!(processor.signal[width * 2 * 4].1, Flag::Reset);// first R of third row
     }
 }

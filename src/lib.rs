@@ -112,7 +112,7 @@ mod tests {
     fn pixel_set_and_get() {
         let width = 1000;
         let height = 1000;
-        let size = width + height *4;
+        let size = width * height *4;
         let raw_data = vec![255 as u8; size];
         let mut picture = Picture::new(raw_data, width, height);
         let pixel = [0, 0, 0, 0];

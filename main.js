@@ -51,6 +51,8 @@ async function main() {
 
             document.getElementById('continous').checked //continous
         )
+
+        console.log(document.getElementById('feedback').value)
     })
 
     var downloadButton = document.getElementById('download')

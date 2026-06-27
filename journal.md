@@ -201,3 +201,73 @@ if width = 2 * height (horizontal half)
     squish half vertically
     tile the left part four time
 
+
+## delay==1 broken
+
+delay == 3 works, delay == 0 works too
+
+I think I have a condition somewhere about delay 0 just bypasses the delay ?
+
+```rust
+if self.delay_time == 0.0 {
+            buf_out = buf_in;
+        }
+```
+
+yup, so, what happens if it's equal to one ? reading the wrong sample probably
+
+I could simplify the delay line class, but the modulations are interestings for future experiments
+
+I actually a made a function to force init to the proper delay
+`RingBuffer::init_delay()`
+the simple one_delay line tests pass, but the image is completely broken nonetheless (black screen), now for all delay line time
+
+may be coming from the reset flags, --> check in continous
+
+yep, works
+
+the reset function actually already uses the init_delay function, weird
+
+added a proper flush function
+
+might have the same problem with the reverb, to check
+
+ah, clear doesn't fill zero, it actually clear all data, the program panic
+
+better flush function that fills with zeros. black screen if delay time 1 or 2. at one I have a weird pixel line in the last collumn
+
+weird, works on an other image
+
+actually it works if height != width (999x1000 can do one pixel delay without problem), maybe a bug in the flag condition ? but why would it trigger only if delay == 1 ??
+
+feedback with delay line 1 cause a diagonal thought, so working but maybe not that well
+only in interleaved and bayer, the flags are probably not putted at the right place, interleaved four fold and bayer two fold, so clearly a 4 color pixel error on the interleaved and a one pixel index drift on the bayer
+
+in w=h and composite (black screen) maybe I should try to test interleaved and bayer to check if the problem might come from the flags
+--> interleaved kinda works, bayer is black screen
+
+this is getting weirder and weirder
+
+I made test for a 9x9 image and the flags seems to be at the right place
+
+to discriminate which side of the image was appearing at the right, I made a 500x500 picture where every sides are easily recognizable, but now the bug is different again : I have une ligne sur deux in composite raw with delay = 1
+(interleaved and bayer are fucked btw)
+
+let's disable process and check that everything reconstuct as it should
+seems to work properly
+check by disabling every thing one by one
+
+yeah it's definitley coming from the way the delay handles de reset
+
+501x501 works perfectly ???
+
+Checked the reset flags by putting every reset sample to 255.0, resets are at the correct position each time (one bar on the first column basically)
+
+Made a dumber ring buffer, the feedback needs to be a crossfade to avoid whiteout
+ah, nah, I just need to clip after adding feedback to input, but I may also try crossfade and see how it behave
+
+btw I still have a luminosity loss when processing with nothing on, probably the filter ?
+
+i clipped the feedback and stuff
+
+WHY IS IT NOT FUN ANYMORE
