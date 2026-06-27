@@ -1,3 +1,4 @@
+
 use crate::outils::{self, rt60_to_gain};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InterpolationMode {
@@ -286,10 +287,10 @@ impl SimpleRingBuffer {
     }
     pub fn process(&mut self, input_sample: f32) -> f32 {
         let output = self.buffer[self.read_index];
-        let feedback = output * self.feedback;
-        let mut to_write = input_sample + feedback;
-        to_write = (to_write / self.max_output_value / 2.0).tanh() * self.max_output_value;
-        self.buffer[self.write_index] = to_write;
+        let mut feedback = output * self.feedback;
+        // feedback = (feedback / self.max_output_value / 2.0).tanh() * self.max_output_value;
+        let to_write = (input_sample as u8).wrapping_add(feedback as u8);
+        self.buffer[self.write_index] = to_write as f32;
         self.increment();
         return output;
     }

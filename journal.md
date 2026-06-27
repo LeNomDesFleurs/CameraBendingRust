@@ -1,5 +1,3 @@
-
-
 ## TODO
 
 - [ ] Bayer matricing not working for now
@@ -14,8 +12,8 @@
 ## BUG
 
 - [x] feedback broken
-- [x] interleaved broken 
-    count was update 1 by 1 instead of 4 by 4
+- [x] interleaved broken
+      count was update 1 by 1 instead of 4 by 4
 - [x] preserve in interleaved broken
 - [x] Diagonal black ray -> flush flagging problem, I reduced the modulo by one for bayer, which created the problem for the interleaved, weird, was probably the fact that the bayer modification and reset flag where not set at the same time
 
@@ -23,7 +21,6 @@
 
 Ok I remember What I was up to
 How to split rows and collums to know when to reset the filters and delay to avoid spilling on the next line
-
 
 I'll need a kind of matrix or something, like building a function from all the constraints then applying it to the signal
 
@@ -35,7 +32,6 @@ One of the big problem with my structure is that adding more ordering mode (diag
 
 pass a reference ?
 have a function for each color ?
-
 
 ~~I use u8 for x and y which is obviously wrong, to do~~
 
@@ -66,13 +62,13 @@ maybe reset at each pixel ? check flag
 nope, even it continous mode it doesn't work
 was not indexing the correct picture lmao
 
-## Not in the right angle 
+## Not in the right angle
 
-I did a weird fix on the bayer at some point where I swapped X and Y in the peeking function, seems that now the problem is also preset 
+I did a weird fix on the bayer at some point where I swapped X and Y in the peeking function, seems that now the problem is also preset
 
-+ interleaved color problem
-+ composite has a diagonal in the middle for some reason
-  
+- interleaved color problem
+- composite has a diagonal in the middle for some reason
+
 now that I swapped x and y, bayer suddenly has a weird blooming / saturation effect
 
 seems like filter resonance is not neutral as 1, but more around 10
@@ -87,7 +83,7 @@ I would need to throw all first answers from the sum of all latency or something
 
 should I add some post processing to enhance the saturation / contrast ?
 
-adding reverb, no result with allpasses, prabably clipping somewhere or something. comb *has* an effect.
+adding reverb, no result with allpasses, prabably clipping somewhere or something. comb _has_ an effect.
 reverb sample rate around 4000 give 400 pixel delay lines
 too much, 300 sample rate is actually way better, 100 even, lower than that I cannot instantiate the delay line, the max time is not handled super well
 
@@ -132,8 +128,8 @@ try managing everything in the rust to be sure that there is no problem with the
 
 try to make a dummy image a fill with white, put the put image definitely doesn't work, I need more info about the image format to be sure that I'm giving it something that makes sense.
 
->ImageData.data Read only
->    A Uint8ClampedArray or Float16Array representing a one-dimensional array containing the data in the RGBA order. The order goes by rows from the top-left pixel to the bottom-right.
+> ImageData.data Read only
+> A Uint8ClampedArray or Float16Array representing a one-dimensional array containing the data in the RGBA order. The order goes by rows from the top-left pixel to the bottom-right.
 
 seems correct [from here](https://developer.mozilla.org/en-US/docs/Web/API/ImageData)
 
@@ -167,16 +163,16 @@ made to use full range
 I'll need to add a kind of param on the frequency on the wavefolder (the ten) and the amount of it
 I could do an interpolation between this output and the actual sample (a dry,wet, actually)
 
-right now to add a param you need to : 
+right now to add a param you need to :
+
 1. add it in the parameters description
 2. add it in the parameters constructor (argument + function)
-4. add it to the main function parameter construction
-5. add it to the html file
-6. retrieve value in js
+3. add it to the main function parameter construction
+4. add it to the html file
+5. retrieve value in js
 
 do I even need to have the parameter struct still ?
 it mainly useful for UI stuff but it's not really relevant anymore
-
 
 ## handling latency
 
@@ -187,20 +183,19 @@ it mainly useful for UI stuff but it's not really relevant anymore
 
     will create but if latency > image size
 
-    slowly getting there, currently I have an offset of delay_time size at the first line, then a 1 pixel offset building up (increment error) 
+    slowly getting there, currently I have an offset of delay_time size at the first line, then a 1 pixel offset building up (increment error)
 
 ## height != width problem
 
 height == width works well
 but height != width creates bug
 for 999x1000
-    create a diagonal 1 pix shift
-if height = 2 * width (vertical half)
-    stretch image double
-if width = 2 * height (horizontal half)
-    squish half vertically
-    tile the left part four time
-
+create a diagonal 1 pix shift
+if height = 2 _ width (vertical half)
+stretch image double
+if width = 2 _ height (horizontal half)
+squish half vertically
+tile the left part four time
 
 ## delay==1 broken
 
@@ -271,3 +266,10 @@ btw I still have a luminosity loss when processing with nothing on, probably the
 i clipped the feedback and stuff
 
 WHY IS IT NOT FUN ANYMORE
+
+k I was doing weird stuff with the feedback
+
+```rust
+buf_in = (input_sample as u8).wrapping_add((delay * self.feedback) as u8) as f32;
+
+```
