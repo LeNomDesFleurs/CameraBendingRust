@@ -292,6 +292,9 @@ impl SimpleRingBuffer {
         let to_write = (input_sample as u8).wrapping_add(feedback as u8);
         self.buffer[self.write_index] = to_write as f32;
         self.increment();
+        if self.read_index==self.write_index{ // need to read before writing for feedback, thus feedback 0 won't work
+            return input_sample;
+        }
         return output;
     }
 

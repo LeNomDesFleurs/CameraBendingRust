@@ -199,7 +199,10 @@ impl Biquad {
         let mut feedback = self.a[0];
         //1500 chosed by experimentation w/ sinensis, self osc around Q = 38
         feedback *= self.resonance / 1500.;
-        feedback = (feedback / 122.0).tanh() * 255.0;
+        if feedback > 255.0{
+            feedback = 255.0;
+        }
+        // feedback = (feedback / 122.0).tanh() * 255.0;
 
         b0 += feedback;
         //shift new value in

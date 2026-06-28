@@ -44,6 +44,7 @@ async function main() {
             document.getElementById('feedback').value, //delay feedback
             document.getElementById('filter_cutoff').value, // filter cutoff
             document.getElementById('filter_resonance').value, // filter resonance
+            document.getElementById('averager').value, // filter resonance
             document.getElementById('reverb_dry_wet').value, //reverb dry wet
             document.getElementById('reverb_time').value, //reverb time
             document.getElementById('reverb_size').value, //reverb dry wet

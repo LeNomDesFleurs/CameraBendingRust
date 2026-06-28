@@ -37,6 +37,7 @@ pub struct Parameters {
     pub delay_feedback: f32,
     pub filter_cutoff: f32,
     pub filter_resonance: f32,
+    averager:f32,
     pub reverb_dry_wet: f32,
     pub reverb_decay: f32,
     reverb_size: f32,
@@ -56,6 +57,7 @@ impl Parameters {
             delay_feedback: 0.0,
             filter_cutoff: 20000.0,
             filter_resonance: 0.7,
+            averager: 0.0,
             reverb_dry_wet: 0.0,
             reverb_decay: 1.0,
             reverb_size: 1.0,
@@ -74,6 +76,7 @@ impl Parameters {
         delay_feedback: f32,
         filter_cutoff: f32,
         filter_resonance: f32,
+        averager: f32,
         reverb_dry_wet: f32,
         reverb_decay: f32,
         reverb_size:f32,
@@ -109,6 +112,7 @@ impl Parameters {
             delay_feedback,
             filter_cutoff,
             filter_resonance,
+            averager,
             reverb_dry_wet,
             reverb_decay,
             reverb_size,
@@ -221,6 +225,7 @@ pub struct Processor {
     number_of_channels: usize, //usize because used as index
     bayer_matrix: [[i32; 2]; 2],
     signal_built: bool,
+    previous_sample: f32,
 }
 
 impl Processor {
@@ -251,6 +256,7 @@ impl Processor {
             size: width * height,
             reverb: Reverb::new(100),
             signal_built: false,
+            previous_sample: 122.0,
         };
         new.init();
         new
@@ -317,8 +323,8 @@ impl Processor {
                 }
             }
             OrderMode::ReverseRow => {
-                for y in 0..self.width {
-                    for x in (0..self.height).rev() {
+                for y in 0..self.height {
+                    for x in (0..self.width).rev() {
                         let pixel = self.source_image_buffer.get_pixel(x, y);
                         self.ordered_picture
                             .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
@@ -437,6 +443,7 @@ impl Processor {
         self.delay.flush();
         self.reverb.flush();
         self.set_filters();
+        self.previous_sample = 0.0;
     }
 
     fn process_sample(&mut self, sample: f32) -> f32 {
@@ -452,7 +459,8 @@ impl Processor {
         if temp < 0.0 {
             temp = 0.0
         }
-
+        temp = (temp * (1.0-self.parameters.averager)) + (self.previous_sample * self.parameters.averager);
+        self.previous_sample = temp;
         return temp;
     }
 
