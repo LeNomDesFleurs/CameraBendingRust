@@ -8,6 +8,7 @@
 - [x] non square image broken
 - [x] optimize signal constuction, don't redo it if the parameters haven't changed
 - [ ] Noise ?
+- [ ] test test alpass vs comb
 
 ## BUG
 
@@ -275,3 +276,14 @@ buf_in = (input_sample as u8).wrapping_add((delay * self.feedback) as u8) as f32
 ```
 
 now I need to add the column and reverse / column & row, then the thing should be ready for release (+ some ui and ux niceties hopefully)
+
+## reverb is broken
+and I think it would be a pain to fix, at least for now
+I could try swapping the delay lines for the dumb ring buffer I made
+weird, it was working prefectly before, and now I notice that the code is *actually* weird, it's a allpass chain, they're not in parallel, so the the delays naturally sum and offset the picture like crazy
+
+but it was actually working before, so *what happened*
+
+the problem clearly comes from the set size function, if I remove it, the reverb works just like before
+
+hard wiring the size value in the function works, i'd tend to think that the problems happen on the way to route the value

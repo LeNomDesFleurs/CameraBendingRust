@@ -57,10 +57,17 @@
     <canvas id="imageCanvas" width="1000" , height="1000" oncontextmenu="return false"></canvas>
     <!-- <button>Settings</button> -->
     <div id="controller">
+        <h3>File</h3>
         <input type="file" id="imageLoader" name="imageLoader" />
+        <br>
         <button id="process">Process</button>
+        <br>
         <button id="reset">Reset</button>
+        <br>
         <button id="download">Download</button>
+
+        <h3>Signal</h3>
+
         Color mode
         <label><input type="radio" name="color_mode" value="0" checked /> Composite</label>
         <label><input type="radio" name="color_mode" value="1" /> Interleaved</label>
@@ -77,21 +84,34 @@
 
         Continous
         <label><input type="checkbox" id="continous" required /> <i>I agree</i></label>
+
+        <h3>Filter</h3>
         Filter Cutoff
         <input type="range" id="filter_cutoff" min="0" max="15000" step="1" value="15000">
         Filter Resonance
         <input type="range" id="filter_resonance" min="0.01" max="100" step="0.01" value="0.7">
+
+
+        <h3>Delay</h3>
         Delay Time
         <input type="range" id="delay" min="0" max="30" step="1" value="1">
         Feedback
         <input type="range" id="feedback" min="0" max="1" step="0.001" value="0">
+
+        <h3>Reverb</h3>
         Reverb Time
-        <input type="range" id="reverb_time" min="0" max="100" step="1" value="0">
+        <input type="range" id="reverb_time" min="0" max="1" step="0.001" value="0.5">
+        Reverb Dry/Wet
+        <input type="range" id="reverb_dry_wet" min="0" max="1" step="0.01" value="0">
+        Reverb Size
+        <input type="range" id="reverb_size" min="0" max="2" step="0.01" value="1">
+
+        <h3>Wavefolding</h3>
         wavefolder amount
         <input type="range" id="wavefolder_amount" min="0" max="1" step="0.01" value="0">
         wavefolder freq
         <input type="range" id="wavefolder_freq" min="1" max="50" step="1" value="10">
-        bitwiser
+        bitwise
         <input type="range" id="bitwise" min="0" max="255" step="1" value="255">
     </div>
     <script type="module" src="main.js"></script>

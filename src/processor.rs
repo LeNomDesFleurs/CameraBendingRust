@@ -39,6 +39,7 @@ pub struct Parameters {
     pub filter_resonance: f32,
     pub reverb_dry_wet: f32,
     pub reverb_decay: f32,
+    reverb_size: f32,
     wavefolder_amount: f32,
     wavefolder_frequency: f32,
     bitwise: f32,
@@ -57,6 +58,7 @@ impl Parameters {
             filter_resonance: 0.7,
             reverb_dry_wet: 0.0,
             reverb_decay: 1.0,
+            reverb_size: 1.0,
             wavefolder_amount: 0.0,
             wavefolder_frequency: 10.0,
             bitwise: 255.0,
@@ -74,6 +76,7 @@ impl Parameters {
         filter_resonance: f32,
         reverb_dry_wet: f32,
         reverb_decay: f32,
+        reverb_size:f32,
         wavefolder_amount: f32,
         wavefolder_frequency: f32,
         bitwise: f32,
@@ -108,6 +111,7 @@ impl Parameters {
             filter_resonance,
             reverb_dry_wet,
             reverb_decay,
+            reverb_size,
             wavefolder_amount,
             wavefolder_frequency,
             bitwise,
@@ -245,7 +249,7 @@ impl Processor {
             width: width,
             height: height,
             size: width * height,
-            reverb: Reverb::new(),
+            reverb: Reverb::new(100),
             signal_built: false,
         };
         new.init();
@@ -268,7 +272,6 @@ impl Processor {
             AlphaMode::Interleave => 4,
             _ => 3,
         };
-
     }
 
     /// Main function orchestrating everything else
@@ -314,8 +317,8 @@ impl Processor {
                 }
             }
             OrderMode::ReverseRow => {
-                for y in self.width..0 {
-                    for x in self.height..0 {
+                for y in 0..self.width {
+                    for x in (0..self.height).rev() {
                         let pixel = self.source_image_buffer.get_pixel(x, y);
                         self.ordered_picture
                             .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
@@ -323,8 +326,8 @@ impl Processor {
                 }
             }
             OrderMode::ReverseColumn => {
-                for x in self.width..0 {
-                    for y in self.height..0 {
+                for x in 0..self.width {
+                    for y in (0..self.height).rev() {
                         let pixel = self.source_image_buffer.get_pixel(x, y);
                         self.ordered_picture
                             .push([pixel[0], pixel[1], pixel[2], pixel[3]]);
@@ -340,8 +343,8 @@ impl Processor {
         let mut modulo = 0;
 
         match self.parameters.order_mode {
-            OrderMode::Column => modulo = self.height,
-            OrderMode::Row => modulo = self.width,
+            OrderMode::Column| OrderMode::ReverseColumn => modulo = self.height,
+            OrderMode::Row| OrderMode::ReverseRow => modulo = self.width,
             _ => {}
         }
 
@@ -409,8 +412,6 @@ impl Processor {
 
     pub fn init(&mut self) {
         self.filter.init(44000.0);
-        // self.delay.init_delay(1.0, self.parameters.delay_time);
-        self.reverb.init(100.0);
     }
 
     pub fn set_filters(&mut self) {
@@ -426,17 +427,16 @@ impl Processor {
     }
 
     pub fn set_reverb(&mut self) {
-        self.reverb
-            .set_reverb_time(self.parameters.reverb_decay as f32);
+        self.reverb.set_reverb_time(self.parameters.reverb_decay as f32);
         self.reverb.dry_wet = self.parameters.reverb_dry_wet as f32;
+        self.reverb.set_size(self.parameters.reverb_size);
     }
 
     fn reset_processing(&mut self) {
         self.filter.flush();
         self.delay.flush();
-        self.reverb.init(100.0);
+        self.reverb.flush();
         self.set_filters();
-        self.set_reverb();
     }
 
     fn process_sample(&mut self, sample: f32) -> f32 {
@@ -467,7 +467,7 @@ impl Processor {
         }
     }
 
-    pub fn composite_reconstruct(&mut self, x: usize, y: usize, count: usize){
+    pub fn composite_reconstruct(&mut self, x: usize, y: usize, count: usize) {
         let r = self.processed_picture[count] as u8;
         let g = self.processed_picture[count + self.offset] as u8;
         let b = self.processed_picture[count + (self.offset * 2)] as u8;
@@ -485,7 +485,7 @@ impl Processor {
         self.output_picture.set_pixel(x, y, [r, g, b, a]);
     }
 
-    pub fn interleaved_reconstruct(&mut self, x: usize, y: usize, count: usize){
+    pub fn interleaved_reconstruct(&mut self, x: usize, y: usize, count: usize) {
         let r = self.processed_picture[count] as u8;
         let g = self.processed_picture[count + 1] as u8;
         let b = self.processed_picture[count + 2] as u8;
@@ -498,7 +498,7 @@ impl Processor {
         self.output_picture.set_pixel(x, y, [r, g, b, a]);
     }
 
-    fn bayer_reconstruct(&mut self, x: usize, y: usize){
+    fn bayer_reconstruct(&mut self, x: usize, y: usize) {
         let color = self.bayer_matrix[y % 2][x % 2] as usize;
         let (r, g, b) = self.bayer_dematricing(x, y, color);
         let a = match self.parameters.alpha_mode {
@@ -509,21 +509,21 @@ impl Processor {
         self.output_picture.set_pixel(x, y, [r, g, b, a]);
     }
 
-    fn reconstruct_pixel(&mut self, x: usize, y: usize, count: usize)-> usize{
+    fn reconstruct_pixel(&mut self, x: usize, y: usize, count: usize) -> usize {
         match self.parameters.color_mode {
-                            ColorMode::Composite => {
-                                self.composite_reconstruct(x, y, count);
-                                count + 1
-                            }
-                            ColorMode::Interleaved => {
-                                self.interleaved_reconstruct(x, y, count);
-                                count + self.number_of_channels
-                            }
-                            ColorMode::Bayer => {
-                                self.bayer_reconstruct(x, y);
-                                count + 1
-                            }
-                        }
+            ColorMode::Composite => {
+                self.composite_reconstruct(x, y, count);
+                count + 1
+            }
+            ColorMode::Interleaved => {
+                self.interleaved_reconstruct(x, y, count);
+                count + self.number_of_channels
+            }
+            ColorMode::Bayer => {
+                self.bayer_reconstruct(x, y);
+                count + 1
+            }
+        }
     }
 
     pub fn reconstruct_image(&mut self) {
@@ -533,19 +533,34 @@ impl Processor {
 
         match self.parameters.order_mode {
             OrderMode::Row => {
-                for y in 0..self.height as usize {
-                    for x in 0..self.width as usize {
+                for y in 0..self.height {
+                    for x in 0..self.width {
                         count = self.reconstruct_pixel(x, y, count);
                     }
                 }
             }
             OrderMode::Column => {
-                for x in 0..self.width as usize {
-                    for y in 0..self.height as usize {
+                for x in 0..self.width {
+                    for y in 0..self.height {
                         count = self.reconstruct_pixel(x, y, count);
                     }
                 }
             }
+            OrderMode::ReverseRow => {
+                for y in 0..self.height {
+                    for x in (0..self.width).rev() {
+                        count = self.reconstruct_pixel(x, y, count);
+                    }
+                }
+            }
+        OrderMode::ReverseColumn => {
+            for x in 0..self.width {
+                for y in (0..self.height).rev(){
+                        count = self.reconstruct_pixel(x, y, count);
+                    }
+                }
+            }
+
             _ => {}
         }
     }
@@ -704,4 +719,39 @@ mod tests {
         assert_eq!(processor.signal[(width * 4) + 1].1, Flag::Continue); // first G of second row
         assert_eq!(processor.signal[width * 2 * 4].1, Flag::Reset); // first R of third row
     }
+
+#[test]
+    fn iterator_assumptions() {
+       for i in (0..4).rev(){
+        print!("{}", i);
+       }
+    }
+
+    #[test]
+    fn reverse_iteration_ordering() {
+        let width = 9;
+        let height = 9;
+        let size = width * height * 4;
+        let raw_data = vec![255 as u8; size];
+        let picture = Picture::new(raw_data, width, height);
+        // picture.get_pixel(0, 0);
+        let mut parameters = Parameters::new_default();
+        parameters.color_mode = ColorMode::Interleaved;
+        parameters.alpha_mode = AlphaMode::Interleave;
+        parameters.order_mode = OrderMode::ReverseRow;
+        let mut processor = Processor::new(picture, parameters);
+        assert_eq!(processor.source_image_buffer.get_lenght(), size);
+        processor.set_number_of_channel();
+        processor.order_signal();
+        assert_eq!(processor.ordered_picture.len(), width*height);
+        processor.split_colors();
+        assert_eq!(processor.signal.len(), size);
+
+        processor.process_signal(); // Vec<f32>
+        processor.reconstruct_image();
+    }
+
 }
+
+
+

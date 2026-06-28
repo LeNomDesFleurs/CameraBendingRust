@@ -1,18 +1,19 @@
-use crate::{buffer::DelayLine, outils};
+use crate::{buffer::{DelayLine, SimpleRingBuffer}, outils};
 
 
 const NUMBER_OF_ALLPASS:usize = 6;
 pub struct Reverb{
-    allpasses: Vec<DelayLine>,
+    allpasses: Vec<SimpleRingBuffer>,
     pub dry_wet: f32,
 }
 
 impl Reverb{
 
-    pub fn new()->Self{
-        let mut allpasses: Vec<DelayLine> = vec![];
+    pub fn new(max_delay_line_size: usize)->Self{
+        let mut allpasses: Vec<SimpleRingBuffer> = vec![];
+        let time = [10, 20, 11, 50, 33, 27];
         for i in 0..NUMBER_OF_ALLPASS{
-            allpasses.push(DelayLine::new(0.100, crate::buffer::DelayMode::Comb));
+            allpasses.push(SimpleRingBuffer::new(max_delay_line_size, time[i], 0.0));
         }
         Reverb{
         allpasses: allpasses,
@@ -20,18 +21,24 @@ impl Reverb{
         }
     }
 
-    pub fn init(&mut self, sample_rate: f32){
-        let time = [0.010, 0.020, 0.011, 0.050, 0.033, 0.027];
-
-          for (i, delayline) in self.allpasses.iter_mut().enumerate() {
-            delayline.init(sample_rate);
-            delayline.set_delay_time(time[i]);
-    }
+    pub fn flush(&mut self){
+        for i in 0..self.allpasses.len(){
+            self.allpasses[i].flush();
+        }
     }
 
-    pub fn set_reverb_time(&mut self, rt60:f32){
+    /// size as a multiplier of default time, range [0; 2] recommended
+    pub fn set_size(&mut self, size: f32){
+        let time = [10, 20, 11, 50, 33, 27];
+        for i in 0..NUMBER_OF_ALLPASS{
+            let delay_time = (time[i] as f32 * size) as usize;
+            self.allpasses[i].set_delay(delay_time);
+        }
+    }
+
+    pub fn set_reverb_time(&mut self, feedback:f32){
         for allpass in self.allpasses.iter_mut(){
-            allpass.set_rt60(rt60);
+            allpass.set_feedback(feedback);
         }
     }
 
@@ -42,5 +49,43 @@ impl Reverb{
             // output_sample;
         }
         return outils::equal_power_crossfade(input_sample, output_sample, self.dry_wet);
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reverb_set_size() {
+        let mut reverb = Reverb::new(100);
+        reverb.set_reverb_time(0.9);
+        reverb.dry_wet = 0.8;
+        reverb.flush();
+        reverb.set_size(2.0);
+        reverb.set_size(0.5);
+        reverb.set_size(1.0);
+        for i in 0..255{
+            reverb.process(i as f32);
+        }
+
+    }
+
+    #[test]
+     fn reverb_dry_wet() {
+        let mut reverb = Reverb::new(100);
+        reverb.set_reverb_time(0.9);
+        reverb.dry_wet = 0.8;
+        reverb.flush();
+        reverb.set_size(2.0);
+        reverb.set_size(0.5);
+        reverb.set_size(1.0);
+        reverb.dry_wet = 0.0;
+        for i in 0..255{
+            assert_eq!(reverb.process(i as f32), i as f32)
+        }
+
     }
 }

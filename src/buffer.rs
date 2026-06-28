@@ -287,7 +287,7 @@ impl SimpleRingBuffer {
     }
     pub fn process(&mut self, input_sample: f32) -> f32 {
         let output = self.buffer[self.read_index];
-        let mut feedback = output * self.feedback;
+        let feedback = output * self.feedback;
         // feedback = (feedback / self.max_output_value / 2.0).tanh() * self.max_output_value;
         let to_write = (input_sample as u8).wrapping_add(feedback as u8);
         self.buffer[self.write_index] = to_write as f32;
@@ -304,12 +304,10 @@ impl SimpleRingBuffer {
         self.buffer.iter_mut().map(|x| *x = 0.0).count();
     }
 
-    pub fn set_delay(&mut self, delay: usize) {
-        assert!(
-            delay < self.size,
-            "delay should be inferior to maximum size"
-        );
-        self.write_index = (self.read_index + delay) % self.size;
+    pub fn set_delay(&mut self, mut delay: usize) {
+        if delay >= self.size {delay = self.size-1}
+        self.read_index = 0;
+        self.write_index = delay;
         self.flush();
     }
 
@@ -433,6 +431,38 @@ mod tests {
         assert_eq!(sample_three, 0.0);
         assert_eq!(sample_four, 0.0);
         assert_eq!(sample_five, 255.0);
+
+        ringbuffer.set_delay(1);
+
+        let sample_six = ringbuffer.process(255.0);
+        let sample_seven = ringbuffer.process(0.0);
+
+        assert_eq!(sample_six, 0.0);
+        assert_eq!(sample_seven, 255.0);
+    }
+
+    #[test]
+    fn set_delay() {
+        let mut ringbuffer = SimpleRingBuffer::new(300, 4, 0.0);
+        let mut sample_one = ringbuffer.process(255.0);
+        let mut sample_two = ringbuffer.process(0.0);
+        let mut sample_three = ringbuffer.process(0.0);
+        let mut sample_four = ringbuffer.process(0.0);
+        let mut sample_five = ringbuffer.process(0.0);
+
+        ringbuffer.set_delay(3);
+        sample_one = ringbuffer.process(255.0);
+        sample_two = ringbuffer.process(0.0);
+        sample_three = ringbuffer.process(0.0);
+        sample_four = ringbuffer.process(0.0);
+        sample_five = ringbuffer.process(0.0);
+
+        // 0.0 0.0 0.0 0.0 0.0
+        assert_eq!(sample_one, 0.0);
+        assert_eq!(sample_two, 0.0);
+        assert_eq!(sample_three, 0.0);
+        assert_eq!(sample_four, 255.0);
+        assert_eq!(sample_five, 0.0);
 
         ringbuffer.set_delay(1);
 
