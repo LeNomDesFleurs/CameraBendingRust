@@ -30,6 +30,7 @@ async function main() {
     imageLoader.addEventListener('input', handleImage, false)
     var canvas = document.getElementById('imageCanvas')
     var ctx = canvas.getContext('2d')
+    ctx.imageSmoothingEnabled = false;
 
     var processButton = document.getElementById('process')
     processButton.addEventListener('click', async () => {
