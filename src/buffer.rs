@@ -1,5 +1,5 @@
 
-use crate::outils::{self, rt60_to_gain};
+use crate::outils::{rt60_to_gain};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InterpolationMode {
     None,

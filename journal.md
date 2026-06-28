@@ -1,13 +1,13 @@
 ## TODO
 
-- [ ] Bayer matricing not working for now
-- [ ] take delay offset in account
+- [x] Bayer matricing not working for now
 - [ ] index picture / create a hash with parameter
     - [ ] use the parameters as argument for input
 - [ ] collumn
 - [ ] latency compensation
-- [ ] non square image broken
+- [x] non square image broken
 - [x] optimize signal constuction, don't redo it if the parameters haven't changed
+- [ ] Noise ?
 
 ## BUG
 
@@ -273,3 +273,5 @@ k I was doing weird stuff with the feedback
 buf_in = (input_sample as u8).wrapping_add((delay * self.feedback) as u8) as f32;
 
 ```
+
+now I need to add the column and reverse / column & row, then the thing should be ready for release (+ some ui and ux niceties hopefully)

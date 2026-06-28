@@ -212,6 +212,7 @@ pub struct Processor {
     width: usize,
     height: usize,
     size: usize,
+    offset: usize,
 
     number_of_channels: usize, //usize because used as index
     bayer_matrix: [[i32; 2]; 2],
@@ -238,7 +239,8 @@ impl Processor {
             processed_picture: Vec::new(),
             slices: Vec::new(),
             source_image_buffer: bufimg.clone(),
-            number_of_channels:3,
+            number_of_channels: 3,
+            offset: 0,
             output_picture: bufimg.clone(),
             width: width,
             height: height,
@@ -261,11 +263,12 @@ impl Processor {
         );
     }
 
-    pub fn set_number_of_channel(&mut self){
+    pub fn set_number_of_channel(&mut self) {
         self.number_of_channels = match self.parameters.alpha_mode {
             AlphaMode::Interleave => 4,
             _ => 3,
         };
+
     }
 
     /// Main function orchestrating everything else
@@ -357,19 +360,20 @@ impl Processor {
                 }
             }
             ColorMode::Interleaved => {
-            for y in 0..self.height{
-                for x in 0..self.width{
-                    let mut flag = Flag::Continue;
-                    if self.parameters.continuous == false && x == 0 {
-                        flag = Flag::Reset
+                for y in 0..self.height {
+                    for x in 0..self.width {
+                        let mut flag = Flag::Continue;
+                        if self.parameters.continuous == false && x == 0 {
+                            flag = Flag::Reset
+                        }
+                        for i in 0..self.number_of_channels {
+                            self.signal
+                                .push((self.ordered_picture[x + y * self.width][i] as f32, flag));
+                            flag = Flag::Continue //dirty, ensure that only the first color triggers the reset
+                        }
                     }
-                    for i in 0..self.number_of_channels {
-                        self.signal.push((self.ordered_picture[x + y * self.width][i] as f32, flag));
-                        flag = Flag::Continue //dirty, ensure that only the first color triggers the reset
-                    }
+                }
             }
-        }
-        }
             ColorMode::Bayer => {
                 let mut bayer_row = false;
                 let mut bayer_column = false;
@@ -463,70 +467,85 @@ impl Processor {
         }
     }
 
+    pub fn composite_reconstruct(&mut self, x: usize, y: usize, count: usize){
+        let r = self.processed_picture[count] as u8;
+        let g = self.processed_picture[count + self.offset] as u8;
+        let b = self.processed_picture[count + (self.offset * 2)] as u8;
+        let mut a = 255;
+
+        match self.parameters.alpha_mode {
+            AlphaMode::Delete => {}
+            AlphaMode::Interleave => {
+                a = self.processed_picture[count + (self.offset * 3)] as u8;
+            }
+            AlphaMode::Preserve => {
+                a = self.source_image_buffer.get_pixel_color(x, y, 3);
+            }
+        }
+        self.output_picture.set_pixel(x, y, [r, g, b, a]);
+    }
+
+    pub fn interleaved_reconstruct(&mut self, x: usize, y: usize, count: usize){
+        let r = self.processed_picture[count] as u8;
+        let g = self.processed_picture[count + 1] as u8;
+        let b = self.processed_picture[count + 2] as u8;
+        let a = match self.parameters.alpha_mode {
+            AlphaMode::Delete => 255 as u8,
+            AlphaMode::Interleave => self.processed_picture[count + 3] as u8,
+            AlphaMode::Preserve => self.source_image_buffer.get_pixel(x, y)[3] as u8,
+        };
+
+        self.output_picture.set_pixel(x, y, [r, g, b, a]);
+    }
+
+    fn bayer_reconstruct(&mut self, x: usize, y: usize){
+        let color = self.bayer_matrix[y % 2][x % 2] as usize;
+        let (r, g, b) = self.bayer_dematricing(x, y, color);
+        let a = match self.parameters.alpha_mode {
+            AlphaMode::Delete => 255 as u8,
+            AlphaMode::Interleave => 255, // To do, 4 color marticing ?
+            AlphaMode::Preserve => self.source_image_buffer.get_pixel(x, y)[3] as u8,
+        };
+        self.output_picture.set_pixel(x, y, [r, g, b, a]);
+    }
+
+    fn reconstruct_pixel(&mut self, x: usize, y: usize, count: usize)-> usize{
+        match self.parameters.color_mode {
+                            ColorMode::Composite => {
+                                self.composite_reconstruct(x, y, count);
+                                count + 1
+                            }
+                            ColorMode::Interleaved => {
+                                self.interleaved_reconstruct(x, y, count);
+                                count + self.number_of_channels
+                            }
+                            ColorMode::Bayer => {
+                                self.bayer_reconstruct(x, y);
+                                count + 1
+                            }
+                        }
+    }
+
     pub fn reconstruct_image(&mut self) {
         let mut count = 0;
         let len = self.processed_picture.len();
-        let destination_len = self.output_picture.data.len();
-        let offset = len / self.number_of_channels;
+        self.offset = len / self.number_of_channels;
 
         match self.parameters.order_mode {
             OrderMode::Row => {
                 for y in 0..self.height as usize {
                     for x in 0..self.width as usize {
-                        match self.parameters.color_mode {
-                            ColorMode::Composite => {
-                                let r = self.processed_picture[count] as u8;
-                                let g = self.processed_picture[count + offset] as u8;
-                                let b = self.processed_picture[count + (offset * 2)] as u8;
-                                let mut a = 255;
-
-                                match self.parameters.alpha_mode {
-                                    AlphaMode::Delete => {}
-                                    AlphaMode::Interleave => {
-                                        a = self.processed_picture[count + (offset * 3)] as u8;
-                                    }
-                                    AlphaMode::Preserve => {
-                                        a = self.source_image_buffer.get_pixel_color(x, y, 3);
-                                    }
-                                }
-                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
-                                count = count + 1;
-                            }
-                            ColorMode::Interleaved => {
-                                let r = self.processed_picture[count] as u8;
-                                let g = self.processed_picture[count + 1] as u8;
-                                let b = self.processed_picture[count + 2] as u8;
-                                let a = match self.parameters.alpha_mode {
-                                    AlphaMode::Delete => 255 as u8,
-                                    AlphaMode::Interleave => {
-                                        self.processed_picture[count + 3] as u8
-                                    }
-                                    AlphaMode::Preserve => {
-                                        self.source_image_buffer.get_pixel(x, y)[3] as u8
-                                    }
-                                };
-
-                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
-                                count = count + self.number_of_channels;
-                            }
-                            ColorMode::Bayer => {
-                                let color = self.bayer_matrix[y % 2][x % 2] as usize;
-                                let (r, g, b) = self.bayer_dematricing(x, y, color);
-                                let a = match self.parameters.alpha_mode {
-                                    AlphaMode::Delete => 255 as u8,
-                                    AlphaMode::Interleave => 255, // To do, 4 color marticing ?
-                                    AlphaMode::Preserve => {
-                                        self.source_image_buffer.get_pixel(x, y)[3] as u8
-                                    }
-                                };
-                                self.output_picture.set_pixel(x, y, [r, g, b, a]);
-                                count = count + 1;
-                            }
-                        }
+                        count = self.reconstruct_pixel(x, y, count);
                     }
                 }
             }
-            OrderMode::Column => {}
+            OrderMode::Column => {
+                for x in 0..self.width as usize {
+                    for y in 0..self.height as usize {
+                        count = self.reconstruct_pixel(x, y, count);
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -647,13 +666,13 @@ mod tests {
         assert_eq!(processor.source_image_buffer.get_lenght(), size);
         processor.order_signal();
         processor.split_colors();
-        // R R R R R R R R R 
+        // R R R R R R R R R
         // R R R R R R R R R
         // ...
         // G G G G G G G G G
         assert_eq!(processor.signal[0].1, Flag::Reset); // first R of first row
         assert_eq!(processor.signal[width].1, Flag::Reset); // first R of second row
-        assert_eq!(processor.signal[(width) - 1].1, Flag::Continue);// last R of first row
+        assert_eq!(processor.signal[(width) - 1].1, Flag::Continue); // last R of first row
         assert_eq!(processor.signal[(width) + 1].1, Flag::Continue); // second R of second row
         assert_eq!(processor.signal[width * height].1, Flag::Reset); //first G of first row
         assert_eq!(processor.signal[width * height + width].1, Flag::Reset); //first G of second row
@@ -679,10 +698,10 @@ mod tests {
         // 1234 5678 9,10,11,12 13,14,15,16 17,18,19,20 21,22,23,24  25,26,27,28 29,30,31,32  33,34,35,36
         // RGBA RGBA    RGBA        RGBA       RGBA       RGBA       RGBA         RGBA         RGBA
         // RGBA RGBA RGBA RGBA RGBA RGBA RGBA RGBA RGBA
-        assert_eq!(processor.signal[0].1, Flag::Reset);// first pixel of first row
+        assert_eq!(processor.signal[0].1, Flag::Reset); // first pixel of first row
         assert_eq!(processor.signal[36].1, Flag::Reset); // first pixel of second row
         assert_eq!(processor.signal[(width * 4) - 1].1, Flag::Continue); // Last A of first row
         assert_eq!(processor.signal[(width * 4) + 1].1, Flag::Continue); // first G of second row
-        assert_eq!(processor.signal[width * 2 * 4].1, Flag::Reset);// first R of third row
+        assert_eq!(processor.signal[width * 2 * 4].1, Flag::Reset); // first R of third row
     }
 }
