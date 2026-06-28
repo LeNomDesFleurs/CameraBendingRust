@@ -452,7 +452,7 @@ impl Processor {
         temp = self.delay.process(temp);
         temp = self.reverb.process(temp);
         temp = self.dumb_wavefolder(temp);
-        temp = (temp as u8 & self.parameters.bitwise as u8) as f32;
+        temp = (temp as u8 | self.parameters.bitwise as u8) as f32;
         if temp > 255.0 {
             temp = 255.0
         }
